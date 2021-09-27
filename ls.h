@@ -19,3 +19,5 @@ extern int s_systemblocks;	/* Shows number of blocks used  */
 extern int t_modifiedsorted;	/* Sort by time modified */
 extern int u_lastaccess; 	/* Shows time of last access  */
 extern int w_forcenonprintable; /* Forces raw nonprintable characters  */
+
+
