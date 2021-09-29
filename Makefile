@@ -1,8 +1,8 @@
 CC = cc
 CFLAGS= -Wall -Werror -Wextra
 TARGET = ls
-
-debug: $(TARGET).c $(TARGET).h 
-	$(CC) $(CFLAGS) $(TARGET).c $(TARGET).h -g -o $(TARGET)
-$(TARGET): $(TARGET).c $(TARGET).h
-	$(CC) $(CFLAGS) $(TARGET).c $(TARGET).h -o $(TARGET)
+SOURCES = ls.c ls_helpers.c ls_helpers.h
+debug: $(SOURCES)  
+	$(CC) $(CFLAGS) $(SOURCES) -g -o $(TARGET)
+$(TARGET): $(TARGET).c 
+	$(CC) $(CFLAGS) $(SOURCES) -o $(TARGET)

@@ -1,6 +1,4 @@
-/* This still very simple ls clone illustrates the use of the stat(2)
- * family of functions to print out some information about the files in
- * the given directory.
+/* 
  */
 #include <sys/param.h>
 #include <sys/types.h>
@@ -13,7 +11,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "ls.h"
+#include "ls_helpers.h"
 
 /* flags  */
 int A_allentries;        /* Includes all files present/previous directory  */
@@ -126,6 +124,9 @@ parseargs(int argc, char **argv)
 				exit(EXIT_FAILURE);
 		}
 	}
+	if (getuid() == 0) {
+		A_allentries = 1;
+	}
 	return flagsset;
 }
 
@@ -179,6 +180,7 @@ splitargs(int argc, char **argv, int offset)
 		}
 	}
 }
+
 void
 printnondir(char* file, struct stat sb)
 {
@@ -189,37 +191,56 @@ printnondir(char* file, struct stat sb)
 void
 printdir(char* dir, struct stat sb) 
 {
+	int i, numentries;
 	struct dirent *dirp;
+	struct dirent **dirpp;
 	DIR *dp;
-	char originaldir[PATH_MAX];;
+	char originaldir[PATH_MAX];
 	
 	getcwd(originaldir, PATH_MAX);
-
-	if ((dp = opendir(dir)) == NULL) {
-		fprintf(stderr, "%s: cannot open directory '%s': Permission denied.\n", getprogname(), dir);
-		EXIT_STATUS = 1;
-		return;
-	}
-	
-	if (chdir(dir) == -1) {
-		fprintf(stderr, "can't chdir to '%s': %s\n", dir, strerror(errno));
-		EXIT_STATUS = 1;
-		return;
-	}
-	while ((dirp = readdir(dp)) != NULL ) {
-		if (stat(dirp->d_name, &sb) == -1) {
-			fprintf(stderr, "Can't stat %s: %s.\n", dirp->d_name, strerror(errno));
+	if (f_unsorted) {
+		if ((dp = opendir(dir)) == NULL) {
+			fprintf(stderr, "%s: cannot open directory '%s': Permission denied.\n", getprogname(), dir);
 			EXIT_STATUS = 1;
-			continue;	
+			return;
 		}
-		printf("%s\n", dirp->d_name);
+
+		if (chdir(dir) == -1) {
+			fprintf(stderr, "can't chdir to '%s': %s\n", dir, strerror(errno));
+			EXIT_STATUS = 1;
+			return;
+		}
+		while ((dirp = readdir(dp)) != NULL ) {
+			if (stat(dirp->d_name, &sb) == -1) {
+				fprintf(stderr, "Can't stat %s: %s.\n", dirp->d_name, strerror(errno));
+				EXIT_STATUS = 1;
+				continue;	
+			}
+			printf("%s\n", dirp->d_name);
+		}
+		closedir(dp);
+		if (chdir(originaldir) == -1) {
+			fprintf(stderr, "can't chdir to '%s': %s\n", originaldir, strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		free(dirp);
 	}
-	closedir(dp);
-	if (chdir(originaldir) == -1) {
-		fprintf(stderr, "can't chdir to '%s': %s\n", originaldir, strerror(errno));
-		exit(EXIT_FAILURE);
+	else if (S_sizesorted) {
+		// Implement traverse by size
+	} else {
+		if ((numentries = scandir(dir, &dirpp, NULL, alphasort)) < 0) {
+			fprintf(stderr, "Can't open directory %s\n", dir);
+			exit(EXIT_FAILURE);
+		}
+		i = 0;
+		while (i != numentries) {
+			printf("%s\n", dirpp[i]->d_name);
+			free(dirpp[i++]);
+		}
+		free(dirpp);
 	}
 }
+
 void
 cleanup() {
 	int i;
@@ -232,6 +253,7 @@ cleanup() {
 	}
 	free(NONDIRS);
 }
+
 int
 main(int argc, char **argv) 
 {
@@ -283,6 +305,9 @@ main(int argc, char **argv)
 	for (i = 0; i < NUMDIRS; i++) {
 		printf("\t%d %s\n", i, DIRS[i]);
 	}*/
+	qsort(NONDIRS, NUMNONDIRS, sizeof(char*), lexicosort);	
+	qsort(DIRS, NUMDIRS, sizeof(char*), lexicosort);
+	
 	for (i = 0; i < NUMNONDIRS; i++) {
 		if (stat(NONDIRS[i], &sb) != 0) {
 			fprintf(stderr, "%s: cannot access %s: No such file or directory.\n", getprogname(), NONDIRS[i]);
