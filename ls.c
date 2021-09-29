@@ -36,17 +36,22 @@ int t_modifiedsorted;    /* Sort by time modified */
 int u_lastaccess;        /* Shows time of last access  */                          
 int w_forcenonprintable; /* Forces raw nonprintable characters  */ 
 
+int NUMDIRS;
+int NUMNONDIRS;
 int EXIT_STATUS;
+char **NONDIRS;
+char **DIRS;
 
 int parseargs(int, char*[]);
-void printother(char*, struct stat);
+void splitargs(int, char*[], int);
+void printnondir(char*, struct stat);
 void printdir(char*, struct stat);
+void cleanup();
 int main(int, char*[]);
 
 int
 parseargs(int argc, char **argv)
 {	
-	printf("Arguments: %d\n", argc);
 	int opt, flagsset;
 
 	flagsset = 0;
@@ -125,103 +130,174 @@ parseargs(int argc, char **argv)
 }
 
 void
-printother(char* file, struct stat sb){
+splitargs(int argc, char **argv, int offset)
+{
+	int i, dirindex, nondirindex, arglength;
+	struct stat sb;
+	dirindex = 0;
+	nondirindex = 0;
+	
+	if (NUMDIRS == 0 && NUMNONDIRS == 0) {
+		NUMDIRS++;
+		if ((DIRS = malloc(NUMDIRS * sizeof(char*))) == NULL) {
+			fprintf(stderr, "Memory could not be allocated");
+			exit(EXIT_FAILURE);
+		}
+		if ((DIRS[0] = malloc(strlen(".") + 1)) == NULL) {
+			fprintf(stderr, "Could not allocate memory.\n");
+			exit(EXIT_FAILURE);
+		}
+		if (strncpy(DIRS[0], ".", strlen(".")) == NULL) {
+			fprintf(stderr, "Could not copy to destination\n");
+			exit(EXIT_FAILURE);
+		}
+	}
+	for (i = 1 + offset; i < argc; i++){
+		if (stat(argv[i], &sb) == 0) {
+			arglength = strlen(argv[i]);
+			if (S_ISDIR(sb.st_mode)) {
+				if ((DIRS[dirindex] = malloc(arglength) + 1) == NULL) {
+					fprintf(stderr, "Could not allocate memory.\n");
+				}
+				if (strncpy(DIRS[dirindex], argv[i], arglength) == NULL) {
+					fprintf(stderr, "Could not copy %s to buffer.\n", argv[i]);
+				}
+				dirindex++;
+			} else {
+				if ((NONDIRS[nondirindex] = malloc(arglength) + 1) == NULL) {
+					fprintf(stderr, "Could not allocate memory.\n");
+				}
+				
+				if (strncpy(NONDIRS[nondirindex], argv[i], arglength) == NULL) {
+					fprintf(stderr, "Could not copy %s to buffer.\n", argv[i]);
+				}
+				nondirindex++;
+			}
+		} else {
+			fprintf(stderr, "%s: cannot access %s: No such file or director\n", getprogname(), argv[i]);
+			EXIT_STATUS = EXIT_FAILURE;
+		}
+	}
+}
+void
+printnondir(char* file, struct stat sb)
+{
 	printf("%s %d\n", file, sb.st_mode);
 
 }
 
 void
-printdir(char* dir, struct stat sb) {
-	printf("%s %d\n", dir, sb.st_mode);
-}
+printdir(char* dir, struct stat sb) 
+{
+	struct dirent *dirp;
+	DIR *dp;
+	char originaldir[PATH_MAX];;
+	
+	getcwd(originaldir, PATH_MAX);
 
+	if ((dp = opendir(dir)) == NULL) {
+		fprintf(stderr, "%s: cannot open directory '%s': Permission denied.\n", getprogname(), dir);
+		EXIT_STATUS = 1;
+		return;
+	}
+	
+	if (chdir(dir) == -1) {
+		fprintf(stderr, "can't chdir to '%s': %s\n", dir, strerror(errno));
+		EXIT_STATUS = 1;
+		return;
+	}
+	while ((dirp = readdir(dp)) != NULL ) {
+		if (stat(dirp->d_name, &sb) == -1) {
+			fprintf(stderr, "Can't stat %s: %s.\n", dirp->d_name, strerror(errno));
+			EXIT_STATUS = 1;
+			continue;	
+		}
+		printf("%s\n", dirp->d_name);
+	}
+	closedir(dp);
+	if (chdir(originaldir) == -1) {
+		fprintf(stderr, "can't chdir to '%s': %s\n", originaldir, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+}
+void
+cleanup() {
+	int i;
+	for (i = 0; i < NUMDIRS; i++) {
+		free(DIRS[i]);
+	}
+	free(DIRS);
+	for (i = 0; i < NUMNONDIRS; i++) {
+		free(NONDIRS[i]);
+	}
+	free(NONDIRS);
+}
 int
-main(int argc, char **argv) {
+main(int argc, char **argv) 
+{
 
 	int i, argoffset;
-	DIR *dp;
-	struct dirent *dirp;
 	struct stat sb;
+	
 	setprogname(argv[0]);
 	
 	// validate directory/permissions
 	// formatting 
-	
+ 	EXIT_STATUS = 0;	
+	NUMDIRS = 0;
+	NUMNONDIRS = 0;
 	argoffset = 0;
 	if (parseargs(argc, argv)) {
 		argoffset = 1;
 	}
-	
-	/*if ((dp = opendir(argv[1])) == NULL ) {
-		fprintf(stderr, "can't open '%s': %s\n", argv[1], strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-
-	if (chdir(argv[1]) == -1) {
-		fprintf(stderr, "can't chdir to '%s': %s\n", argv[1], strerror(errno));
-		exit(EXIT_FAILURE);
-	}*/
-
-	EXIT_STATUS = 1;
+	 
 	for (i = 1 + argoffset; i < argc; i++){
 		if (stat(argv[i], &sb) == 0) {
 			if (S_ISDIR(sb.st_mode)) {
-				printdir(argv[i], sb);
+				NUMDIRS++;
 			} else {
-				printother(argv[i], sb);
+				NUMNONDIRS++;
 			}
 		} else {
-			printf("%s: cannot access %s: No such file or directory", getprogname(), argv[i]);
+			fprintf(stderr, "%s: cannot access %s: No such file or director\n", getprogname(), argv[i]);
 			EXIT_STATUS = EXIT_FAILURE;
 		}
 	}
-	if (i == 1 + argoffset) {
-		if (stat(".", &sb)!= 0) {
-			printf("%s: cannot access .: No such file or directory", getprogname());
-		}
-		printdir(".", sb);
+
+	if (NUMDIRS > 0 &&  (DIRS = malloc(NUMDIRS * sizeof(char*))) == NULL) {
+		fprintf(stderr, "Memory could not be allocated");
+		exit(EXIT_FAILURE);
 	}
-	
-	exit(EXIT_STATUS);
-	while ((dirp = readdir(dp)) != NULL ) {
-		struct stat sb;
-		if (stat(dirp->d_name, &sb) == -1) {
-			fprintf(stderr, "Can't stat %s: %s\n", dirp->d_name,
-						strerror(errno));
 
-			if (lstat(dirp->d_name, &sb) == -1) {
-				fprintf(stderr,"Can't stat %s: %s\n", dirp->d_name,
-						strerror(errno));
-				continue;
-			}
-		}
 
-		printf("%s: ", dirp->d_name);
-		if (S_ISREG(sb.st_mode))
-			printf("regular file");
-		else if (S_ISDIR(sb.st_mode))
-			printf("directory");
-		else if (S_ISCHR(sb.st_mode))
-			printf("character special");
-		else if (S_ISBLK(sb.st_mode))
-			printf("block special");
-		else if (S_ISFIFO(sb.st_mode))
-			printf("FIFO");
-		else if (S_ISLNK(sb.st_mode))
-			printf("symbolic link");
-		else if (S_ISSOCK(sb.st_mode))
-			printf("socket");
-		else
-			printf("unknown");
+	if (NUMNONDIRS > 0 && (NONDIRS = malloc(NUMNONDIRS * sizeof(char*))) == NULL) {
+		fprintf(stderr, "Memory could not be allocated");
+		exit(EXIT_FAILURE);
+	}
 
-		printf(" -- according to stat\n");
-
-		if (lstat(dirp->d_name, &sb) == -1) {
-			fprintf(stderr,"Can't stat %s: %s\n", dirp->d_name,
-						strerror(errno));
+	splitargs(argc, argv, argoffset);
+	/*
+	for (i = 0; i < NUMNONDIRS; i++) {
+		printf("\t%d %s\n", i, NONDIRS[i]);
+	}
+	for (i = 0; i < NUMDIRS; i++) {
+		printf("\t%d %s\n", i, DIRS[i]);
+	}*/
+	for (i = 0; i < NUMNONDIRS; i++) {
+		if (stat(NONDIRS[i], &sb) != 0) {
+			fprintf(stderr, "%s: cannot access %s: No such file or directory.\n", getprogname(), NONDIRS[i]);
 			continue;
 		}
+		printnondir(NONDIRS[i], sb);
 	}
-	closedir(dp);
-	exit(EXIT_SUCCESS);
+	for (i = 0; i < NUMDIRS; i++) {
+		if (stat(DIRS[i], &sb) != 0) {
+			fprintf(stderr, "%s: cannot access %s: No such file or directory.\n", getprogname(), DIRS[i]);
+			continue;
+		}
+		printdir(DIRS[i], sb);
+	}
+
+	cleanup(DIRS, NONDIRS);
+	exit(EXIT_STATUS);
 }
