@@ -3,9 +3,8 @@
 #include <limits.h>
 #include <string.h>
 
-struct file {
-	char entryname[PATH_MAX] ;
-	struct stat sb;
-};
+int countentries(char*);
+
 
 int lexicosort(const void*, const void*);
+int sizesort(const void*, const void*);

@@ -1,4 +1,4 @@
-/* 
+/*
  */
 #include <sys/param.h>
 #include <sys/types.h>
@@ -11,7 +11,9 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "ls_helpers.h"
+#include "ls.h"
+#include "helpers.h"
+#include "print.h"
 
 /* flags  */
 int A_allentries;        /* Includes all files present/previous directory  */
@@ -34,24 +36,26 @@ int t_modifiedsorted;    /* Sort by time modified */
 int u_lastaccess;        /* Shows time of last access  */                          
 int w_forcenonprintable; /* Forces raw nonprintable characters  */ 
 
+int sorted;
+
 int NUMDIRS;
 int NUMNONDIRS;
 int EXIT_STATUS;
 char **NONDIRS;
 char **DIRS;
 
-int parseargs(int, char*[]);
-void splitargs(int, char*[], int);
-void printnondir(char*, struct stat);
-void printdir(char*, struct stat);
-void cleanup();
-int main(int, char*[]);
+
+struct fileentry {
+	struct stat sb;
+	char* entryname;
+};
 
 int
 parseargs(int argc, char **argv)
 {	
 	int opt, flagsset;
-
+	
+	sorted = 0;
 	flagsset = 0;
 	while ((opt = getopt(argc, argv, "AacdFfhiklnqRrSstuw")) != -1) {
 		flagsset = 1;
@@ -65,6 +69,7 @@ parseargs(int argc, char **argv)
 			case 'c':
 				c_lastChanged = 1;
 				u_lastaccess = 0;
+				sorted = 1;
 				break;
 			case 'd':
 				d_directories = 1;
@@ -74,6 +79,7 @@ parseargs(int argc, char **argv)
 				break;
 			case 'f':
 				f_unsorted = 1;
+				sorted = 0;
 				break;
 			case 'h':
 				h_humanreadable = 1;
@@ -101,19 +107,23 @@ parseargs(int argc, char **argv)
 				break;
 			case 'r':
 				r_reverseorder = 1;
+				sorted = 1;
 				break;
 			case 'S':
 				S_sizesorted = 1;
+				sorted = 1;
 				break;
 			case 's':
 				s_systemblocks = 1;
 				break;
 			case 't':
 				t_modifiedsorted = 1;
+				sorted = 1;
 				break;
 			case 'u':
 				u_lastaccess = 1;
 				c_lastChanged = 0;
+				sorted = 1;
 				break;
 			case 'w':
 				w_forcenonprintable = 1;
@@ -157,7 +167,7 @@ splitargs(int argc, char **argv, int offset)
 		if (stat(argv[i], &sb) == 0) {
 			arglength = strlen(argv[i]);
 			if (S_ISDIR(sb.st_mode)) {
-				if ((DIRS[dirindex] = malloc(arglength) + 1) == NULL) {
+				if ((DIRS[dirindex] = malloc(arglength + 1)) == NULL) {
 					fprintf(stderr, "Could not allocate memory.\n");
 				}
 				if (strncpy(DIRS[dirindex], argv[i], arglength) == NULL) {
@@ -165,7 +175,7 @@ splitargs(int argc, char **argv, int offset)
 				}
 				dirindex++;
 			} else {
-				if ((NONDIRS[nondirindex] = malloc(arglength) + 1) == NULL) {
+				if ((NONDIRS[nondirindex] = malloc(arglength + 1)) == NULL) {
 					fprintf(stderr, "Could not allocate memory.\n");
 				}
 				
@@ -182,63 +192,93 @@ splitargs(int argc, char **argv, int offset)
 }
 
 void
-printnondir(char* file, struct stat sb)
+formatnondir(char* file, struct stat sb)
 {
-	printf("%s %d\n", file, sb.st_mode);
-
+	printdefault(file);
+	if (0) {
+		printf("%d", sb.st_mode);
+	}
 }
 
 void
-printdir(char* dir, struct stat sb) 
+formatdir(char* dir, struct stat sb) 
 {
-	int i, numentries;
+	int i, entrylen, numentries;
 	struct dirent *dirp;
-	struct dirent **dirpp;
 	DIR *dp;
 	char originaldir[PATH_MAX];
-	
+	char **entries;
+		
 	getcwd(originaldir, PATH_MAX);
-	if (f_unsorted) {
-		if ((dp = opendir(dir)) == NULL) {
-			fprintf(stderr, "%s: cannot open directory '%s': Permission denied.\n", getprogname(), dir);
+	
+	numentries = countentries(dir);
+	if (numentries == -1 ) {
+		fprintf(stderr, "%s: cannot open directory '%s': Permission denied.\n", getprogname(), dir);
+		EXIT_STATUS = 1;
+		return;
+	}
+	/* Stores unsorted directory entries */
+	if ((entries = malloc(numentries * sizeof(char*))) == NULL) {
+		fprintf(stderr, "Cannot allocate memory.\n");
+	}
+	
+	
+	if ((dp = opendir(dir)) == NULL) {
+		fprintf(stderr, "%s: cannot open directory '%s': Permission denied.\n", getprogname(), dir);
+		EXIT_STATUS = 1;
+		return;
+	}
+	if (chdir(dir) == -1) {
+		fprintf(stderr, "can't chdir to '%s': %s\n", dir, strerror(errno));
+		EXIT_STATUS = 1;
+		return;
+	}
+	i = 0;
+	while ((dirp = readdir(dp)) != NULL ) {
+		if (stat(dirp->d_name, &sb) == -1) {
+			fprintf(stderr, "Can't stat %s: %s.\n", dirp->d_name, strerror(errno));
 			EXIT_STATUS = 1;
-			return;
+			continue;	
 		}
+		entrylen = strlen(dirp->d_name);
+		if ((entries[i] = malloc(entrylen + 1)) == NULL) {
+			fprintf(stderr, "Cannot allocate memory.\n");
+		}
+		if (strncpy(entries[i], dirp->d_name, entrylen) == NULL) {
+			fprintf(stderr, "Cannot copy %s to buffer", dirp->d_name);
+		}
+		i++;
+	}
+	
+	closedir(dp);
+	free(dirp);
 
-		if (chdir(dir) == -1) {
-			fprintf(stderr, "can't chdir to '%s': %s\n", dir, strerror(errno));
-			EXIT_STATUS = 1;
-			return;
-		}
-		while ((dirp = readdir(dp)) != NULL ) {
-			if (stat(dirp->d_name, &sb) == -1) {
-				fprintf(stderr, "Can't stat %s: %s.\n", dirp->d_name, strerror(errno));
-				EXIT_STATUS = 1;
-				continue;	
-			}
-			printf("%s\n", dirp->d_name);
-		}
-		closedir(dp);
-		if (chdir(originaldir) == -1) {
-			fprintf(stderr, "can't chdir to '%s': %s\n", originaldir, strerror(errno));
-			exit(EXIT_FAILURE);
-		}
-		free(dirp);
+	/* Sort entries based on flags  */
+	if (S_sizesorted) { // Implement traverse by size
+	} 
+	if (c_lastChanged) { // Implement traverse by last changed
+	} 
+	if (r_reverseorder) { // Implement traverse in reverse order
+	} 
+	if (t_modifiedsorted) { // Implement traverse by last modified
+	} 
+	if (u_lastaccess) { // Implement traverse by last access
+	} 
+	if (sorted == 0 && f_unsorted == 0) {
+		qsort(entries, numentries, sizeof(char*), lexicosort);
 	}
-	else if (S_sizesorted) {
-		// Implement traverse by size
-	} else {
-		if ((numentries = scandir(dir, &dirpp, NULL, alphasort)) < 0) {
-			fprintf(stderr, "Can't open directory %s\n", dir);
-			exit(EXIT_FAILURE);
-		}
-		i = 0;
-		while (i != numentries) {
-			printf("%s\n", dirpp[i]->d_name);
-			free(dirpp[i++]);
-		}
-		free(dirpp);
+
+	/* Format each directory entry  */
+	for (i = 0; i < numentries; i++) {
+		printdefault(entries[i]);
+		free(entries[i]);
 	}
+	
+	if (chdir(originaldir) == -1) {
+		fprintf(stderr, "can't chdir to '%s': %s\n", originaldir, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	free(entries);
 }
 
 void
@@ -298,29 +338,38 @@ main(int argc, char **argv)
 	}
 
 	splitargs(argc, argv, argoffset);
-	/*
+	
+	qsort(NONDIRS, NUMNONDIRS, sizeof(char*), lexicosort);	
+	qsort(DIRS, NUMDIRS, sizeof(char*), lexicosort);
+	/*	
 	for (i = 0; i < NUMNONDIRS; i++) {
 		printf("\t%d %s\n", i, NONDIRS[i]);
 	}
 	for (i = 0; i < NUMDIRS; i++) {
 		printf("\t%d %s\n", i, DIRS[i]);
 	}*/
-	qsort(NONDIRS, NUMNONDIRS, sizeof(char*), lexicosort);	
-	qsort(DIRS, NUMDIRS, sizeof(char*), lexicosort);
-	
+
 	for (i = 0; i < NUMNONDIRS; i++) {
 		if (stat(NONDIRS[i], &sb) != 0) {
 			fprintf(stderr, "%s: cannot access %s: No such file or directory.\n", getprogname(), NONDIRS[i]);
 			continue;
 		}
-		printnondir(NONDIRS[i], sb);
+		formatnondir(NONDIRS[i], sb);
 	}
 	for (i = 0; i < NUMDIRS; i++) {
+		
 		if (stat(DIRS[i], &sb) != 0) {
 			fprintf(stderr, "%s: cannot access %s: No such file or directory.\n", getprogname(), DIRS[i]);
 			continue;
 		}
-		printdir(DIRS[i], sb);
+		if (NUMDIRS + NUMNONDIRS > 1) {
+			if (i > 0) {
+				printf("\n");
+			}
+			printf("%s:\n", DIRS[i]);
+		
+		}
+		formatdir(DIRS[i], sb);
 	}
 
 	cleanup(DIRS, NONDIRS);
