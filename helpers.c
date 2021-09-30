@@ -1,6 +1,7 @@
 #include <sys/stat.h>
 
 #include <dirent.h>
+#include <fts.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -33,19 +34,100 @@ lexicosort(const void* str1, const void* str2)
 	return strcmp(*(const char **) str1, *(const char **) str2);
 }
 
-int sizesort(const void* file1, const void* file2)
+int 
+fts_lexicosort(const FTSENT** file1, const FTSENT** file2)
 {
+	
+	return (strcmp((*file1)->fts_name, (*file2)->fts_name));
+}
 
-	return strcmp(*(const char **) file1, *(const char **) file2);
+int 
+fts_rlexicosort(const FTSENT** file1, const FTSENT** file2)
+{
+	
+	return -1 * (strcmp((*file1)->fts_name, (*file2)->fts_name));
+}
 
-	/*const fileentry *f1 = (fileentry *)file1;
-	const fileentry *f2 = (fileentry *)file2;
-	if (f1->sb.st_size > f2->sb.st_size) {
+int 
+fts_sizesort(const FTSENT** file1, const FTSENT** file2)
+{
+	int file1size = (*file1)->fts_statp->st_size;
+	int file2size = (*file2)->fts_statp->st_size;
+	if (file1size < file2size) {
 		return 1;
-	}
-	if (f1->sb.st_size < f2->sb.st_size) {
+	} 
+	if (file1size > file2size) {
 		return -1;
 	}
-	return 0;
-	*/
+	return (strcmp((*file1)->fts_name, (*file2)->fts_name));
+}
+
+int 
+fts_rsizesort(const FTSENT** file1, const FTSENT** file2)
+{
+	int file1size = (*file1)->fts_statp->st_size;
+	int file2size = (*file2)->fts_statp->st_size;
+	if (file1size < file2size) {
+		return -1;
+	} 
+	if (file1size > file2size) {
+		return 1;
+	}
+	return -1 * (strcmp((*file1)->fts_name, (*file2)->fts_name));
+}
+
+int
+fts_timemodifiedsort(const FTSENT** file1, const FTSENT** file2)
+{
+	int file1time = (*file1)->fts_statp->st_mtime;
+	int file2time = (*file2)->fts_statp->st_mtime;
+	if (file1time < file2time) {
+		return 1;
+	}	
+	if (file1time > file2time) {
+		return -1;
+	}
+	return -(strcmp((*file1)->fts_name, (*file2)->fts_name));
+}
+
+int
+fts_rtimemodifiedsort(const FTSENT** file1, const FTSENT** file2)
+{
+	int file1time = (*file1)->fts_statp->st_mtime;
+	int file2time = (*file2)->fts_statp->st_mtime;
+	if (file1time < file2time) {
+		return -1;
+	}	
+	if (file1time > file2time) {
+		return 1;
+	}
+	return (strcmp((*file1)->fts_name, (*file2)->fts_name));
+}
+
+int
+fts_lastaccesssort(const FTSENT** file1, const FTSENT** file2)
+{
+	int file1time = (*file1)->fts_statp->st_atime;
+	int file2time = (*file2)->fts_statp->st_atime;
+	if (file1time < file2time) {
+		return 1;
+	}	
+	if (file1time > file2time) {
+		return -1;
+	}
+	return (strcmp((*file1)->fts_name, (*file2)->fts_name));
+}
+
+int
+fts_rlastaccesssort(const FTSENT** file1, const FTSENT** file2)
+{
+	int file1time = (*file1)->fts_statp->st_atime;
+	int file2time = (*file2)->fts_statp->st_atime;
+	if (file1time < file2time) {
+		return -1;
+	}	
+	if (file1time > file2time) {
+		return 1;
+	}
+	return (strcmp((*file1)->fts_name, (*file2)->fts_name));
 }
