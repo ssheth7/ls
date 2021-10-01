@@ -4,9 +4,6 @@
 #include <limits.h>
 #include <string.h>
 
-int countentries(char*);
-
-
 int lexicosort(const void*, const void*);
 
 int fts_lexicosort(const FTSENT** file1, const FTSENT** file2);

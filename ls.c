@@ -63,6 +63,7 @@ parseargs(int argc, char **argv)
 				break;
 			case 'a':
 				a_allentries = 1;
+				A_allentries = 0;
 				break;
 			case 'c':
 				if (f_unsorted == 0) {
@@ -202,7 +203,12 @@ splitargs(int argc, char **argv, int offset)
 void
 formatnondir(char* file, struct stat sb)
 {
+	if (A_allentries) {
+		;
+	}
+	else {
 	printdefault(file);
+	}
 	if (0) {
 		printf("%d", sb.st_mode);
 	}
@@ -211,7 +217,7 @@ formatnondir(char* file, struct stat sb)
 void
 formatdir(char* dir) 
 {
-
+	int fileinfo;
 	FTS *directory;
 	FTSENT *entry;
 	char *dirptr[2];
@@ -239,12 +245,15 @@ formatdir(char* dir)
 	}
 	
 	if (u_lastaccess) {
-		;
+		comparefunction = &fts_lastaccesssort;
+		if (r_reverseorder) {
+			comparefunction = &fts_rlastaccesssort;
+		}
 	}
 	if (f_unsorted) {
 		comparefunction = NULL;	
 	}
-		
+	
 	dirptr[0] = dir;
 	dirptr[1] = NULL;
 	
@@ -253,8 +262,20 @@ formatdir(char* dir)
 		EXIT_STATUS = EXIT_FAILURE;
 		return;
 	}
-	while( (entry = fts_read(directory)) != NULL) {
-		if (entry->fts_level == 1) {
+	while((entry = fts_read(directory)) != NULL) {
+		if (entry->fts_level == 0) {
+			continue;
+		}
+		if (!R_recurse) {
+			if (fts_set(directory, entry, FTS_SKIP) != 0) {
+				fprintf(stderr, "Could not set fts options.\n");
+				EXIT_STATUS = 1;
+				continue;
+			}	
+		}
+		
+		fileinfo = entry->fts_info;
+		if (fileinfo != FTS_DP) {
 			formatnondir(entry->fts_name, *entry->fts_statp);
 		}
 	}	

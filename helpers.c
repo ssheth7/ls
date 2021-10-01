@@ -8,25 +8,6 @@
 #include "helpers.h"
 #include "ls.h"
 
-int 
-countentries(char *dir)
-{
-	int numentries;
-	struct dirent *dirp;
-	DIR *dp;
-	if ((dp = opendir(dir)) == NULL) {
-		return -1;
-	}
-	numentries = 0;
-	while ((dirp = readdir(dp)) != NULL) {
-		numentries++;
-	}
-
-	closedir(dp);
-	free(dirp);
-	
-	return numentries;
-}
 
 int 
 lexicosort(const void* str1, const void* str2) 
