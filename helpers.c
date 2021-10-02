@@ -1,3 +1,6 @@
+/*
+ * Contains sorting helper methods for ls.c
+*/
 #include <sys/stat.h>
 
 #include <dirent.h>
@@ -104,6 +107,34 @@ fts_rlastaccesssort(const FTSENT** file1, const FTSENT** file2)
 {
 	int file1time = (*file1)->fts_statp->st_atime;
 	int file2time = (*file2)->fts_statp->st_atime;
+	if (file1time < file2time) {
+		return -1;
+	}	
+	if (file1time > file2time) {
+		return 1;
+	}
+	return (strcmp((*file1)->fts_name, (*file2)->fts_name));
+}
+
+int
+fts_statuschangesort(const FTSENT** file1, const FTSENT** file2)
+{
+	int file1time = (*file1)->fts_statp->st_ctime;
+	int file2time = (*file2)->fts_statp->st_ctime;
+	if (file1time < file2time) {
+		return 1;
+	}	
+	if (file1time > file2time) {
+		return -1;
+	}
+	return -(strcmp((*file1)->fts_name, (*file2)->fts_name));
+}
+
+int
+fts_rstatuschangesort(const FTSENT** file1, const FTSENT** file2)
+{
+	int file1time = (*file1)->fts_statp->st_ctime;
+	int file2time = (*file2)->fts_statp->st_ctime;
 	if (file1time < file2time) {
 		return -1;
 	}	

@@ -1,5 +1,13 @@
 /*
- */
+ * "Advanced Programming in the UNIX Environment" midterm assignment
+ * Based on NETBSD's ls(1)
+*/
+
+/* Shivam Sheth (ssheth7)
+ * ls: list the files in a directory
+ * 10/02/2021
+*/
+
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -19,7 +27,7 @@
 /* flags  */
 int A_allentries;        /* Includes all files present/previous directory  */
 int a_allentries;        /* Includes hidden files  */
-int c_lastChanged;       /* Shows last changed  */
+int c_lastchanged;       /* Shows last changed  */
 int d_directories;       /* Shows directories as plain files */
 int F_specialsymbols;    /* Adds symbols to special files */
 int f_unsorted;          /* Files are unsorted */
@@ -37,18 +45,16 @@ int t_modifiedsorted;    /* Sort by time modified */
 int u_lastaccess;        /* Shows time of last access  */                          
 int w_forcenonprintable; /* Forces raw nonprintable characters  */ 
 
-int NUMDIRS;
-int NUMNONDIRS;
-int EXIT_STATUS;
-char **NONDIRS;
-char **DIRS;
+int NUMDIRS; 		/* Number of directory arguments  */
+int NUMNONDIRS; 	/* Number of non-dirextory arguments */
+int EXIT_STATUS; 
+char **DIRS;   		/* String array of directory arguments */
+char **NONDIRS; 	/* String array of non-directory arguments */
 
 
-struct fileentry {
-	struct stat sb;
-	char* entryname;
-};
-
+/*
+ * Parses command line arguments and sets option flags
+*/
 int
 parseargs(int argc, char **argv)
 {	
@@ -66,10 +72,10 @@ parseargs(int argc, char **argv)
 				A_allentries = 0;
 				break;
 			case 'c':
-				if (f_unsorted == 0) {
+				if (f_unsorted == 1) {
 					break;
 				}
-				c_lastChanged = 1;
+				c_lastchanged = 1;
 				u_lastaccess = 0;
 				break;
 			case 'd':
@@ -80,7 +86,7 @@ parseargs(int argc, char **argv)
 				break;
 			case 'f':
 				f_unsorted = a_allentries = 1;
-				r_reverseorder = S_sizesorted = u_lastaccess = c_lastChanged = 0;
+				r_reverseorder = S_sizesorted = u_lastaccess = c_lastchanged = 0;
 				break;
 			case 'h':
 				h_humanreadable = 1;
@@ -107,13 +113,13 @@ parseargs(int argc, char **argv)
 				R_recurse = 1;
 				break;
 			case 'r':
-				if (f_unsorted == 0) {
+				if (f_unsorted == 1) {
 					break;
 				}
 				r_reverseorder = 1;
 				break;
 			case 'S':
-				if (f_unsorted == 0) {
+				if (f_unsorted == 1) {
 					break;
 				}
 				S_sizesorted = 1;
@@ -128,11 +134,11 @@ parseargs(int argc, char **argv)
 				t_modifiedsorted = 1;
 				break;
 			case 'u':
-				if (f_unsorted == 0) {
+				if (f_unsorted == 1) {
 					break;
 				}
 				u_lastaccess = 1;
-				c_lastChanged = 0;
+				c_lastchanged = 0;
 				break;
 			case 'w':
 				w_forcenonprintable = 1;
@@ -146,9 +152,13 @@ parseargs(int argc, char **argv)
 	if (getuid() == 0) {
 		A_allentries = 1;
 	}
+
 	return flagsset;
 }
 
+/*
+ * Splits arguments into DIR and NONDIR arrays
+*/
 void
 splitargs(int argc, char **argv, int offset)
 {
@@ -157,7 +167,7 @@ splitargs(int argc, char **argv, int offset)
 	dirindex = 0;
 	nondirindex = 0;
 	
-	if (NUMDIRS == 0 && NUMNONDIRS == 0) {
+	if (NUMDIRS == 0 && NUMNONDIRS == 0) { /* If no command line arguments are provided */
 		NUMDIRS++;
 		if ((DIRS = malloc(NUMDIRS * sizeof(char*))) == NULL) {
 			fprintf(stderr, "Memory could not be allocated");
@@ -172,6 +182,7 @@ splitargs(int argc, char **argv, int offset)
 			exit(EXIT_FAILURE);
 		}
 	}
+	
 	for (i = 1 + offset; i < argc; i++){
 		if (stat(argv[i], &sb) == 0) {
 			arglength = strlen(argv[i]);
@@ -200,6 +211,9 @@ splitargs(int argc, char **argv, int offset)
 	}
 }
 
+/*
+ * Reads flags and called corresponding print functions 
+*/
 void
 formatnondir(char* file, struct stat sb)
 {
@@ -214,6 +228,10 @@ formatnondir(char* file, struct stat sb)
 	}
 }
 
+/*
+ * Reads contents of directory using set sort flags and sends directory 
+ * entries to formatnondir
+*/
 void
 formatdir(char* dir) 
 {
@@ -244,16 +262,25 @@ formatdir(char* dir)
 		}
 	}
 	
-	if (u_lastaccess) {
+	if (t_modifiedsorted && u_lastaccess) {
 		comparefunction = &fts_lastaccesssort;
 		if (r_reverseorder) {
 			comparefunction = &fts_rlastaccesssort;
 		}
 	}
+	if (t_modifiedsorted && c_lastchanged) {
+		comparefunction = &fts_statuschangesort;
+		if (r_reverseorder) { 
+			comparefunction = &fts_rstatuschangesort;
+		}
+	}
 	if (f_unsorted) {
 		comparefunction = NULL;	
 	}
-	
+	if ((dirptr[0] = malloc(strlen(dir) + 1)) == NULL) {
+		fprintf(stderr, "Could not allocate memory.\n");
+		exit(EXIT_FAILURE);
+	}	
 	dirptr[0] = dir;
 	dirptr[1] = NULL;
 	
@@ -283,6 +310,9 @@ formatdir(char* dir)
 	fts_close(directory);
 }
 
+/*
+ * Frees memory from global data structures
+*/
 void
 cleanup() {
 	int i;
@@ -296,25 +326,29 @@ cleanup() {
 	free(NONDIRS);
 }
 
+/*
+ * Program takes in a set of arguments and optionally a directory. If no directory is
+ * provided, the program defaults to the current shell's directory. The program prints the
+ * contents of the directory based on the arguments given. 
+*/
 int
 main(int argc, char **argv) 
 {
-
 	int i, argoffset;
 	struct stat sb;
 	
 	setprogname(argv[0]);
 	
-	// validate directory/permissions
-	// formatting 
  	EXIT_STATUS = 0;	
 	NUMDIRS = 0;
 	NUMNONDIRS = 0;
 	argoffset = 0;
+	
 	if (parseargs(argc, argv)) {
 		argoffset = 1;
 	}
 	 
+ 	/* Counts the number of nondirs and dirs arguments given */		
 	for (i = 1 + argoffset; i < argc; i++){
 		if (stat(argv[i], &sb) == 0) {
 			if (S_ISDIR(sb.st_mode)) {
@@ -343,14 +377,8 @@ main(int argc, char **argv)
 	
 	qsort(NONDIRS, NUMNONDIRS, sizeof(char*), lexicosort);	
 	qsort(DIRS, NUMDIRS, sizeof(char*), lexicosort);
-	/*	
-	for (i = 0; i < NUMNONDIRS; i++) {
-		printf("\t%d %s\n", i, NONDIRS[i]);
-	}
-	for (i = 0; i < NUMDIRS; i++) {
-		printf("\t%d %s\n", i, DIRS[i]);
-	}*/
 
+	/* Prints non directory entries and then directory entries */	
 	for (i = 0; i < NUMNONDIRS; i++) {
 		if (stat(NONDIRS[i], &sb) != 0) {
 			fprintf(stderr, "%s: cannot access %s: No such file or directory.\n", getprogname(), NONDIRS[i]);
@@ -358,6 +386,7 @@ main(int argc, char **argv)
 		}
 		formatnondir(NONDIRS[i], sb);
 	}
+
 	for (i = 0; i < NUMDIRS; i++) {
 		
 		if (stat(DIRS[i], &sb) != 0) {

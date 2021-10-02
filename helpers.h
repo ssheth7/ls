@@ -1,3 +1,6 @@
+#ifndef _HELPERS_H_
+#define _HELPERS_H_
+
 #include <sys/stat.h>
 
 #include <fts.h>
@@ -17,3 +20,8 @@ int fts_rtimemodifiedsort(const FTSENT** file1, const FTSENT** file2);
 
 int fts_lastaccesssort(const FTSENT** file1, const FTSENT** file2);
 int fts_rlastaccesssort(const FTSENT** file1, const FTSENT** file2);
+
+int fts_statuschangesort(const FTSENT** file1, const FTSENT** file2);
+int fts_rstatuschangesort(const FTSENT** file1, const FTSENT** file2);
+
+#endif /* !_HELPERS_H_  */

@@ -1,3 +1,7 @@
+/*
+ * Contains print helper functions for ls.c
+*/
+
 #include <stdio.h>
 
 #include "print.h"
