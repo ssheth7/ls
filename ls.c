@@ -25,7 +25,7 @@
 #include "print.h"
 
 /* flags  */
-int A_allentries;        /* Includes all files present/previous directory  */
+int A_allentries;        /* Includes all files but current/previous directory  */
 int a_allentries;        /* Includes hidden files  */
 int c_lastchanged;       /* Shows last changed  */
 int d_directories;       /* Shows directories as plain files */
@@ -149,7 +149,7 @@ parseargs(int argc, char **argv)
 				exit(EXIT_FAILURE);
 		}
 	}
-	if (getuid() == 0) {
+	if (getuid() == 0 && a_allentries == 0) {
 		A_allentries = 1;
 	}
 
@@ -215,27 +215,28 @@ splitargs(int argc, char **argv, int offset)
  * Reads flags and called corresponding print functions 
 */
 void
-formatnondir(char* file, struct stat sb)
+formatentry(char* entry, struct stat sb)
 {
+	if(F_specialsymbols) {
+		addsymbols_F(&entry, sb);
+	} 
 	if (A_allentries) {
-		;
-	}
-	else {
-	printdefault(file);
-	}
-	if (0) {
-		printf("%d", sb.st_mode);
+		printall_A(entry);
+	} else if (a_allentries) {
+		printall_a(entry);
+	} else {
+		printdefault(entry);
 	}
 }
 
 /*
  * Reads contents of directory using set sort flags and sends directory 
- * entries to formatnondir
+ * entries to formatentry
 */
 void
 formatdir(char* dir) 
 {
-	int fileinfo;
+	int fileinfo, ftsopen_flags;
 	FTS *directory;
 	FTSENT *entry;
 	char *dirptr[2];
@@ -277,6 +278,11 @@ formatdir(char* dir)
 	if (f_unsorted) {
 		comparefunction = NULL;	
 	}
+	
+	ftsopen_flags = FTS_COMFOLLOW;
+	if (a_allentries == 1) {
+		ftsopen_flags |= FTS_SEEDOT;
+	}
 	if ((dirptr[0] = malloc(strlen(dir) + 1)) == NULL) {
 		fprintf(stderr, "Could not allocate memory.\n");
 		exit(EXIT_FAILURE);
@@ -284,7 +290,7 @@ formatdir(char* dir)
 	dirptr[0] = dir;
 	dirptr[1] = NULL;
 	
-	if ((directory = fts_open(dirptr, FTS_COMFOLLOW | FTS_SKIP, comparefunction)) == NULL) {
+	if ((directory = fts_open(dirptr, ftsopen_flags, comparefunction)) == NULL) {
 		fprintf(stderr, "Cannot open %s.\n", dir);
 		EXIT_STATUS = EXIT_FAILURE;
 		return;
@@ -303,11 +309,11 @@ formatdir(char* dir)
 		
 		fileinfo = entry->fts_info;
 		if (fileinfo != FTS_DP) {
-			formatnondir(entry->fts_name, *entry->fts_statp);
+			formatentry(entry->fts_name, *entry->fts_statp);
 		}
 	}	
-	
 	fts_close(directory);
+	free(dirptr[0]);	
 }
 
 /*
@@ -384,7 +390,7 @@ main(int argc, char **argv)
 			fprintf(stderr, "%s: cannot access %s: No such file or directory.\n", getprogname(), NONDIRS[i]);
 			continue;
 		}
-		formatnondir(NONDIRS[i], sb);
+		formatentry(NONDIRS[i], sb);
 	}
 
 	for (i = 0; i < NUMDIRS; i++) {
