@@ -23,7 +23,12 @@
 #include "ls.h"
 #include "helpers.h"
 #include "print.h"
-
+/*
+ TODO:
+ add void to printf/fprintf
+ run exit status checks
+ improve makefile
+*/
 /* flags  */
 int A_allentries;        /* Includes all files but current/previous directory  */
 int a_allentries;        /* Includes hidden files  */
@@ -220,10 +225,13 @@ formatentry(char* entry, struct stat sb)
 	if(F_specialsymbols) {
 		addsymbols_F(&entry, sb);
 	} 
-	if (A_allentries) {
+	if(w_forcenonprintable) {
+		printraw_w(entry);
+	} else if (q_forcenonprintable) {
+		printraw_q(entry);
+	}
+	else if (A_allentries || a_allentries) {
 		printall_A(entry);
-	} else if (a_allentries) {
-		printall_a(entry);
 	} else {
 		printdefault(entry);
 	}

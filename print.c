@@ -4,6 +4,7 @@
 
 #include <sys/stat.h>
 
+#include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,15 +53,50 @@ addsymbols_F(char** entry, struct stat sb)
 		appended = '=';
 	} else if(S_ISFIFO(entrymode)) {
 		appended = '|';
+	} else if (S_ISWHT(entrymode)) {
+		appended = '%';
 	} else if (S_IEXEC & entrymode) {
 		appended = '*';
-	} else if (S_ISWHT(entrymode)) {
-		printf("%d ", S_IFWHT * entrymode);
-		appended = '%';
 	} else {
 		free(modifiedentry);
 		return;
 	}
 	snprintf(modifiedentry, strlen(*entry) + 2, "%s%c", *entry, appended);
 	*entry = modifiedentry;
+	free(modifiedentry);
 }
+
+void
+printraw_q(char* entry)
+{
+	int index;
+
+	index = 0;
+	while(entry[index]) {
+		if (isprint(entry[index])) {
+			printf("%c", entry[index]);
+		} else {
+			printf("?");
+		}
+		index++;
+	}
+	printf("\n");
+}
+
+void
+printraw_w(char* entry)
+{
+	int index;
+
+	index = 0;
+	while(entry[index]) {
+		if (isprint(entry[index])) {
+			printf("%c", entry[index]);
+		} else {
+			printf("%c", entry[index]);
+		}
+		index++;
+	}
+	printf("\n");
+}
+

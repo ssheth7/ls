@@ -7,6 +7,7 @@ void printdefault(char*);
 void printall_A(char*);
 void printall_a(char*);
 void addsymbols_F(char**, struct stat sb);
-
-#endif /* !_PRINT_H_  */
+void printraw_q(char*);
+void printraw_w(char*);
+#endif /* !_PRINT_H_ */
 
