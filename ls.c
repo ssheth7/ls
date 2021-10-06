@@ -95,12 +95,14 @@ parseargs(int argc, char **argv)
 				break;
 			case 'h':
 				h_humanreadable = 1;
+				k_kilobytes = 0;
 				break;
 			case 'i':
 				i_inodes = 1;
 				break;
 			case 'k':
 				k_kilobytes = 1;
+				h_humanreadable = 0;
 				break;
 			case 'l':
 				l_longformat = 1;
@@ -222,19 +224,28 @@ splitargs(int argc, char **argv, int offset)
 void
 formatentry(char* entry, struct stat sb)
 {
-	if(F_specialsymbols) {
+	int printallflags = A_allentries || a_allentries;
+	
+	if (!printallflags && entry[0] == '.') {
+		return;
+	}
+	
+	if (F_specialsymbols) {
 		addsymbols_F(&entry, sb);
+	}
+	if (i_inodes) {
+		printinode_i(sb);
 	} 
-	if(w_forcenonprintable) {
+	if (s_systemblocks) {
+		printblocks_s(sb, k_kilobytes, h_humanreadable);
+	}
+	if (w_forcenonprintable) {
 		printraw_w(entry);
 	} else if (q_forcenonprintable) {
 		printraw_q(entry);
-	}
-	else if (A_allentries || a_allentries) {
-		printall_A(entry);
 	} else {
 		printdefault(entry);
-	}
+	} 
 }
 
 /*
@@ -246,7 +257,7 @@ formatdir(char* dir)
 {
 	int fileinfo, ftsopen_flags;
 	FTS *directory;
-	FTSENT *entry;
+	FTSENT *entry, *children;
 	char *dirptr[2];
 	
 	int (*comparefunction)(const FTSENT **, const FTSENT **);
@@ -303,6 +314,12 @@ formatdir(char* dir)
 		EXIT_STATUS = EXIT_FAILURE;
 		return;
 	}
+	//int sum = 0;
+	if ((children = fts_children(directory, 0)) == NULL) {
+		fprintf(stderr, "Could not get child directory: %s\n", strerror(errno));
+		EXIT_STATUS = EXIT_FAILURE;
+	}
+	printf("chidlren %s\n", children->fts_name);
 	while((entry = fts_read(directory)) != NULL) {
 		if (entry->fts_level == 0) {
 			continue;
@@ -314,8 +331,11 @@ formatdir(char* dir)
 				continue;
 			}	
 		}
-		
 		fileinfo = entry->fts_info;
+		/*if (s_systemblocks && fileinfo == FTS_D) {
+			countblocks(directory, entry, h_humanreadable, k_kilobytes);	
+		}*/
+		
 		if (fileinfo != FTS_DP) {
 			formatentry(entry->fts_name, *entry->fts_statp);
 		}

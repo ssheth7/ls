@@ -13,26 +13,6 @@
 #include "print.h"
 
 void
-printdefault(char* entry)
-{
-	if (entry[0] != '.') {
-		printf("%s\n", entry);
-	}
-}
-
-void
-printall_A(char* entry) 
-{
-	printf("%s\n", entry);
-}
-
-void
-printall_a(char* entry)
-{
-	printf("%s\n", entry);
-}
-
-void
 addsymbols_F(char** entry, struct stat sb)
 {
 	int entrymode;
@@ -67,11 +47,18 @@ addsymbols_F(char** entry, struct stat sb)
 }
 
 void
+printdefault(char* entry)
+{
+	printf("%s\n", entry);
+}
+
+void
 printraw_q(char* entry)
 {
 	int index;
 
 	index = 0;
+
 	while(entry[index]) {
 		if (isprint(entry[index])) {
 			printf("%c", entry[index]);
@@ -100,3 +87,17 @@ printraw_w(char* entry)
 	printf("\n");
 }
 
+void
+printinode_i(struct stat sb) {
+	printf("%ld ", sb.st_ino);
+}
+
+void
+printblocks_s(struct stat sb, int k_kilobytes, int h_humanreadable)
+{
+	int blocks;
+	blocks = sb.st_blocks;
+	if (!k_kilobytes && !h_humanreadable) {
+		printf("%d ", blocks);	
+	}
+}
