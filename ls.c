@@ -28,6 +28,9 @@
  add void to printf/fprintf
  run exit status checks
  improve makefile
+ long format
+ fix w option
+ recursive option
 */
 /* flags  */
 int A_allentries;        /* Includes all files but current/previous directory  */
@@ -50,11 +53,12 @@ int t_modifiedsorted;    /* Sort by time modified */
 int u_lastaccess;        /* Shows time of last access  */                          
 int w_forcenonprintable; /* Forces raw nonprintable characters  */ 
 
-int NUMDIRS; 		/* Number of directory arguments  */
-int NUMNONDIRS; 	/* Number of non-dirextory arguments */
+int BLOCKSIZE;		 /* BLOCKSIZE env variable  */
+int NUMDIRS; 		 /* Number of directory arguments  */
+int NUMNONDIRS; 	 /* Number of non-dirextory arguments */
 int EXIT_STATUS; 
-char **DIRS;   		/* String array of directory arguments */
-char **NONDIRS; 	/* String array of non-directory arguments */
+char **DIRS;   		 /* String array of directory arguments */
+char **NONDIRS; 	 /* String array of non-directory arguments */
 
 
 /*
@@ -63,8 +67,9 @@ char **NONDIRS; 	/* String array of non-directory arguments */
 int
 parseargs(int argc, char **argv)
 {	
-	int opt, flagsset;
-	
+	int opt, flagsset, envlength;
+	char* blocksize;
+		
 	flagsset = 0;
 	while ((opt = getopt(argc, argv, "AacdFfhiklnqRrSstuw")) != -1) {
 		flagsset = 1;
@@ -159,7 +164,18 @@ parseargs(int argc, char **argv)
 	if (getuid() == 0 && a_allentries == 0) {
 		A_allentries = 1;
 	}
-
+	if (s_systemblocks == 1 && h_humanreadable == 0 && k_kilobytes == 0) {
+		if (getenv("BLOCKSIZE") != NULL) {
+			envlength = strlen(getenv("BLOCKSIZE"));
+			if ((blocksize = malloc(envlength * sizeof(char*))) == NULL) {
+				fprintf(stderr, "Could not allocate memory: %s\n", strerror(errno));
+				exit(EXIT_FAILURE);
+			}
+			blocksize = getenv("BLOCKSIZE");
+			BLOCKSIZE = strtol(blocksize, (char **)NULL, 10);
+			printf("Blocksize %d\n", BLOCKSIZE);
+		}
+	} 
 	return flagsset;
 }
 
@@ -255,10 +271,13 @@ formatentry(char* entry, struct stat sb)
 void
 formatdir(char* dir) 
 {
-	int fileinfo, ftsopen_flags;
-	FTS *directory;
-	FTSENT *entry, *children;
+	int blocksum, fileinfo;
+	int ftsopenflags, printallflags;
 	char *dirptr[2];
+	FTSENT *children, *entry;
+	FTS *directory;
+	
+	printallflags = A_allentries || a_allentries;
 	
 	int (*comparefunction)(const FTSENT **, const FTSENT **);
 	
@@ -298,9 +317,9 @@ formatdir(char* dir)
 		comparefunction = NULL;	
 	}
 	
-	ftsopen_flags = FTS_COMFOLLOW;
+	ftsopenflags = FTS_COMFOLLOW;
 	if (a_allentries == 1) {
-		ftsopen_flags |= FTS_SEEDOT;
+		ftsopenflags |= FTS_SEEDOT;
 	}
 	if ((dirptr[0] = malloc(strlen(dir) + 1)) == NULL) {
 		fprintf(stderr, "Could not allocate memory.\n");
@@ -309,39 +328,76 @@ formatdir(char* dir)
 	dirptr[0] = dir;
 	dirptr[1] = NULL;
 	
-	if ((directory = fts_open(dirptr, ftsopen_flags, comparefunction)) == NULL) {
+	if ((directory = fts_open(dirptr, ftsopenflags, comparefunction)) == NULL) {
 		fprintf(stderr, "Cannot open %s.\n", dir);
 		EXIT_STATUS = EXIT_FAILURE;
 		return;
 	}
-	//int sum = 0;
-	if ((children = fts_children(directory, 0)) == NULL) {
-		fprintf(stderr, "Could not get child directory: %s\n", strerror(errno));
-		EXIT_STATUS = EXIT_FAILURE;
-	}
-	printf("chidlren %s\n", children->fts_name);
-	while((entry = fts_read(directory)) != NULL) {
-		if (entry->fts_level == 0) {
+	while(R_recurse == 0 && (entry = fts_read(directory)) != NULL) {
+		fileinfo = entry->fts_info;
+		if (fileinfo == FTS_DP) {
 			continue;
 		}
-		if (!R_recurse) {
+		if (entry->fts_level > 0  && fileinfo == FTS_D) {
 			if (fts_set(directory, entry, FTS_SKIP) != 0) {
 				fprintf(stderr, "Could not set fts options.\n");
 				EXIT_STATUS = 1;
 				continue;
-			}	
+			}
 		}
-		fileinfo = entry->fts_info;
-		/*if (s_systemblocks && fileinfo == FTS_D) {
-			countblocks(directory, entry, h_humanreadable, k_kilobytes);	
-		}*/
+		blocksum = 0;
 		
-		if (fileinfo != FTS_DP) {
+		if (s_systemblocks == 1) {
+			if ((children = fts_children(directory, 0)) != NULL) {
+				while(children != NULL) {
+					if (printallflags || strncmp(children->fts_name, ".", 1) != 0) {
+						if (k_kilobytes) {
+							blocksum += children->fts_statp->st_blocks / 2;
+						} else {	
+							blocksum += children->fts_statp->st_blocks;
+						}
+					}
+					children = children->fts_link;
+				}
+			}
+		}
+		if (s_systemblocks && entry->fts_level == 0) {
+			if (fileinfo == FTS_D) {
+				printf("total %d\n", blocksum);
+			} 
+		}	
+		if ( entry->fts_level > 0) {
+			formatentry(entry->fts_name, *entry->fts_statp);
+		}
+	}	
+	while(R_recurse == 1 && (entry = fts_read(directory)) != NULL) {
+		fileinfo = entry->fts_info;
+		if (fileinfo == FTS_DP) {
+			continue;
+		}
+		blocksum = 0;
+		if (s_systemblocks == 1) {
+			if ((children = fts_children(directory, 0)) != NULL) {
+				while(children != NULL) {
+					if (printallflags || strncmp(children->fts_name, ".", 1) != 0) {
+						blocksum += children->fts_statp->st_blocks;
+					}
+					children = children->fts_link;
+				}
+			}
+		}
+		if (s_systemblocks && entry->fts_level == 0) {
+			if (fileinfo == FTS_D) {
+				printf("total %d\n", blocksum);
+			} 
+		}	
+		if ( entry->fts_level > 0) {
 			formatentry(entry->fts_name, *entry->fts_statp);
 		}
 	}	
 	fts_close(directory);
-	free(dirptr[0]);	
+	free(dirptr[0]);
+	free(dirptr[1]);
 }
 
 /*

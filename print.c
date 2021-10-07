@@ -99,5 +99,8 @@ printblocks_s(struct stat sb, int k_kilobytes, int h_humanreadable)
 	blocks = sb.st_blocks;
 	if (!k_kilobytes && !h_humanreadable) {
 		printf("%d ", blocks);	
+	} else if (k_kilobytes) {
+		printf("%d ", blocks / 2);		
 	}
+	
 }
