@@ -53,7 +53,7 @@ int t_modifiedsorted;    /* Sort by time modified */
 int u_lastaccess;        /* Shows time of last access  */                          
 int w_forcenonprintable; /* Forces raw nonprintable characters  */ 
 
-int BLOCKSIZE;		 /* BLOCKSIZE env variable  */
+long BLOCKSIZE;		 /* BLOCKSIZE env variable  */
 int NUMDIRS; 		 /* Number of directory arguments  */
 int NUMNONDIRS; 	 /* Number of non-dirextory arguments */
 int EXIT_STATUS; 
@@ -70,6 +70,7 @@ parseargs(int argc, char **argv)
 	int opt, flagsset, envlength;
 	char* blocksize;
 		
+	BLOCKSIZE = 512;
 	flagsset = 0;
 	while ((opt = getopt(argc, argv, "AacdFfhiklnqRrSstuw")) != -1) {
 		flagsset = 1;
@@ -108,6 +109,7 @@ parseargs(int argc, char **argv)
 			case 'k':
 				k_kilobytes = 1;
 				h_humanreadable = 0;
+				BLOCKSIZE = 1024;
 				break;
 			case 'l':
 				l_longformat = 1;
@@ -173,9 +175,18 @@ parseargs(int argc, char **argv)
 			}
 			blocksize = getenv("BLOCKSIZE");
 			BLOCKSIZE = strtol(blocksize, (char **)NULL, 10);
-			printf("Blocksize %d\n", BLOCKSIZE);
-		}
-	} 
+			if (BLOCKSIZE < 512) {
+				printf("%s: %ld: minimum blocksize is 512\n", getprogname(), BLOCKSIZE);
+				BLOCKSIZE = 512;
+			}
+			if (BLOCKSIZE > 1074741824) {
+				printf("%s: %ld: maximum blocksize is 1G\n", getprogname(), BLOCKSIZE);
+				BLOCKSIZE = 1074741824;
+			}
+			//free(blocksize);
+		} 
+		
+	}
 	return flagsset;
 }
 
@@ -253,7 +264,7 @@ formatentry(char* entry, struct stat sb)
 		printinode_i(sb);
 	} 
 	if (s_systemblocks) {
-		printblocks_s(sb, k_kilobytes, h_humanreadable);
+		printblocks_s(sb);
 	}
 	if (w_forcenonprintable) {
 		printraw_w(entry);
@@ -351,9 +362,7 @@ formatdir(char* dir)
 			if ((children = fts_children(directory, 0)) != NULL) {
 				while(children != NULL) {
 					if (printallflags || strncmp(children->fts_name, ".", 1) != 0) {
-						if (k_kilobytes) {
-							blocksum += children->fts_statp->st_blocks / 2;
-						} else {	
+						if (!h_humanreadable) {
 							blocksum += children->fts_statp->st_blocks;
 						}
 					}
@@ -363,6 +372,12 @@ formatdir(char* dir)
 		}
 		if (s_systemblocks && entry->fts_level == 0) {
 			if (fileinfo == FTS_D) {
+				/*if (blocksum < BLOCKSIZE) {
+					blocksum = 1;
+				} else {
+					blocksum = blocksum / (BLOCKSIZE / 512);
+				}*/
+				blocksum = blocksum / (BLOCKSIZE / 512);
 				printf("total %d\n", blocksum);
 			} 
 		}	
@@ -370,6 +385,7 @@ formatdir(char* dir)
 			formatentry(entry->fts_name, *entry->fts_statp);
 		}
 	}	
+	// Recursion loop
 	while(R_recurse == 1 && (entry = fts_read(directory)) != NULL) {
 		fileinfo = entry->fts_info;
 		if (fileinfo == FTS_DP) {

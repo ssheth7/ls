@@ -12,6 +12,12 @@
 
 #include "print.h"
 
+extern int s_systemblocks;
+extern int h_humanreadable;
+extern int k_kilobytes;
+
+extern int BLOCKSIZE;
+
 void
 addsymbols_F(char** entry, struct stat sb)
 {
@@ -88,19 +94,23 @@ printraw_w(char* entry)
 }
 
 void
-printinode_i(struct stat sb) {
+printinode_i(struct stat sb) 
+{
 	printf("%ld ", sb.st_ino);
 }
 
 void
-printblocks_s(struct stat sb, int k_kilobytes, int h_humanreadable)
+printblocks_s(struct stat sb)
 {
-	int blocks;
+	int blocks, adjustedblocks;
 	blocks = sb.st_blocks;
-	if (!k_kilobytes && !h_humanreadable) {
-		printf("%d ", blocks);	
-	} else if (k_kilobytes) {
+	adjustedblocks = blocks / (BLOCKSIZE / 512);
+	if (adjustedblocks == 0 && blocks > 0) {
+		adjustedblocks = 1;
+	}
+	if (!h_humanreadable) {
+		printf("%d ", adjustedblocks);	
+	} else {
 		printf("%d ", blocks / 2);		
 	}
-	
 }

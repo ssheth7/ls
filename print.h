@@ -9,7 +9,7 @@ void printall(char*);
 void printraw_q(char*);
 void printraw_w(char*);
 void printinode_i(struct stat);
-void printblocks_s(struct stat, int, int);
+void printblocks_s(struct stat);
 
 #endif /* !_PRINT_H_ */
 
