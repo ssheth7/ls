@@ -283,12 +283,11 @@ void
 formatdir(char* dir) 
 {
 	int blocksum, fileinfo;
-	int ftsopenflags, printallflags;
+	int ftsopenflags;
 	char *dirptr[2];
 	FTSENT *children, *entry;
 	FTS *directory;
 	
-	printallflags = A_allentries || a_allentries;
 	
 	int (*comparefunction)(const FTSENT **, const FTSENT **);
 	
@@ -344,73 +343,48 @@ formatdir(char* dir)
 		EXIT_STATUS = EXIT_FAILURE;
 		return;
 	}
-	while(R_recurse == 0 && (entry = fts_read(directory)) != NULL) {
-		fileinfo = entry->fts_info;
-		if (fileinfo == FTS_DP) {
-			continue;
-		}
-		if (entry->fts_level > 0  && fileinfo == FTS_D) {
-			if (fts_set(directory, entry, FTS_SKIP) != 0) {
-				fprintf(stderr, "Could not set fts options.\n");
-				EXIT_STATUS = 1;
+	if (R_recurse == 0) {
+		while((entry = fts_read(directory)) != NULL) {
+			fileinfo = entry->fts_info;
+			if (fileinfo == FTS_DP) {
 				continue;
 			}
-		}
-		blocksum = 0;
-		
-		if (s_systemblocks == 1) {
-			if ((children = fts_children(directory, 0)) != NULL) {
-				while(children != NULL) {
-					if (printallflags || strncmp(children->fts_name, ".", 1) != 0) {
-						if (!h_humanreadable) {
-							blocksum += children->fts_statp->st_blocks;
-						}
-					}
-					children = children->fts_link;
+			if (entry->fts_level > 0  && fileinfo == FTS_D) {
+				if (fts_set(directory, entry, FTS_SKIP) != 0) {
+					fprintf(stderr, "Could not set fts options.\n");
+					EXIT_STATUS = 1;
+					continue;
 				}
 			}
-		}
-		if (s_systemblocks && entry->fts_level == 0) {
-			if (fileinfo == FTS_D) {
-				/*if (blocksum < BLOCKSIZE) {
-					blocksum = 1;
-				} else {
-					blocksum = blocksum / (BLOCKSIZE / 512);
-				}*/
-				blocksum = blocksum / (BLOCKSIZE / 512);
-				printf("total %d\n", blocksum);
-			} 
-		}	
-		if ( entry->fts_level > 0) {
-			formatentry(entry->fts_name, *entry->fts_statp);
-		}
-	}	
-	// Recursion loop
-	while(R_recurse == 1 && (entry = fts_read(directory)) != NULL) {
-		fileinfo = entry->fts_info;
-		if (fileinfo == FTS_DP) {
-			continue;
-		}
-		blocksum = 0;
-		if (s_systemblocks == 1) {
-			if ((children = fts_children(directory, 0)) != NULL) {
-				while(children != NULL) {
-					if (printallflags || strncmp(children->fts_name, ".", 1) != 0) {
-						blocksum += children->fts_statp->st_blocks;
-					}
-					children = children->fts_link;
+			blocksum = 0;
+			if (s_systemblocks == 1) {
+				if (entry->fts_level == 0 && (children = fts_children(directory, 0)) != NULL) {
+					blocksum = countblocks(children);
+					formatblocks(blocksum);
 				}
 			}
-		}
-		if (s_systemblocks && entry->fts_level == 0) {
-			if (fileinfo == FTS_D) {
-				printf("total %d\n", blocksum);
-			} 
+			if (entry->fts_level > 0) {
+				formatentry(entry->fts_name, *entry->fts_statp);
+			}
 		}	
-		if ( entry->fts_level > 0) {
-			formatentry(entry->fts_name, *entry->fts_statp);
-		}
-	}	
+	} else {
+		while(R_recurse == 1 && (entry = fts_read(directory)) != NULL) {
+			fileinfo = entry->fts_info;
+			if (fileinfo == FTS_DP) {
+				continue;
+			}
+			blocksum = 0;
+			if (s_systemblocks == 1) {
+				if ((children = fts_children(directory, 0)) != NULL) {
+					blocksum = countblocks(children);
+					formatblocks(blocksum);
+					}
+				}
+				if (entry->fts_level > 0) {
+					formatentry(entry->fts_name, *entry->fts_statp);
+				}
+		}	
+	}
 	fts_close(directory);
 	free(dirptr[0]);
 	free(dirptr[1]);

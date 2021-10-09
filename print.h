@@ -3,6 +3,7 @@
 
 #include <sys/stat.h>
 
+void formatblocks(int);
 void addsymbols_F(char**, struct stat);
 void printdefault(char*);
 void printall(char*);
