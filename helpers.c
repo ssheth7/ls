@@ -45,6 +45,8 @@ countblocks(FTSENT *children)
 			if (printallflags || strncmp(children->fts_name, ".", 1) != 0) {
 				if (!h_humanreadable) {
 					blocksum += children->fts_statp->st_blocks;
+				} else {
+					blocksum += children->fts_statp->st_size;	
 				}
 			}
 			children = children->fts_link;

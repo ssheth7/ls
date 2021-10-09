@@ -6,6 +6,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,25 +36,8 @@ extern int u_lastaccess;        /* Shows time of last access  */
 extern int w_forcenonprintable; /* Forces raw nonprintable characters  */ 
 extern int BLOCKSIZE;
 
-void
-formatblocks(int blocksum) {
-	if (!h_humanreadable) {
-		if (blocksum < BLOCKSIZE / 512) {
-			blocksum = 1;
-		} else {
-			blocksum = 1 + (blocksum - 1)/ (BLOCKSIZE / 512);
-		}
-		printf("total %d\n", blocksum);
-	} else {
-		if (blocksum < 1024) {
-			printf("total %dB\n", blocksum);
-		} else if (blocksum < 1048576) {
-			printf("total %dM\n", blocksum);
-		} else if (blocksum < 1073741824) {
-			printf("total %dG\n", blocksum);
-		}
-	}
-}
+#define CEIL(w, x, y) (1 + (w - 1)/(x / y))
+
 void
 addsymbols_F(char** entry, struct stat sb)
 {
@@ -138,15 +122,41 @@ printinode_i(struct stat sb)
 void
 printblocks_s(struct stat sb)
 {
-	int blocks, adjustedblocks;
+	float blocks;
 	blocks = sb.st_blocks;
-	adjustedblocks = blocks / (BLOCKSIZE / 512);
-	if (adjustedblocks == 0 && blocks > 0) {
-		adjustedblocks = 1;
-	}
+	
 	if (!h_humanreadable) {
-		printf("%d ", adjustedblocks);	
+		blocks = CEIL(blocks, BLOCKSIZE, 512);
+		printf("total %f\n", blocks);
+		return;	
+	}
+	blocks = sb.st_size;
+	if ((humanize_number()	
+}
+
+
+void
+formatblocks(int blocksum) {
+	if (!h_humanreadable) {
+		if (blocksum < BLOCKSIZE / 512) {
+			blocksum = 1;
+		} else {
+			blocksum = CEIL(blocksum, BLOCKSIZE, 512);
+		}
+		printf("total %d\n", blocksum);
+		return;
+	} 
+	if (blocksum < KILOBYTE) {
+		printf("total %dB\n", blocksum);
+	} else if (blocksum < MEGABYTE) {
+		blocksum /= KILOBYTE;
+		printf("total %dK\n", blocksum);
+	} else if (blocksum < GIGABYTE) {
+		blocksum /= MEGABYTE;
+		printf("total %dM\n", blocksum);
 	} else {
-		printf("%d ", blocks / 2);		
+		blocksum /= GIGABYTE;
+		printf("total %dG\n", blocksum);
 	}
 }
+
