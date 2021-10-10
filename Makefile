@@ -9,13 +9,13 @@ $(TARGET): $(SOURCES)
 	$(CC) $(CFLAGS) $(SOURCES) -o $(TARGET)
 
 ls.o: ls.c ls.h
-	${CC} -c ls.c
+	${CC} -g -c ls.c
 
 print.o: print.c print.h
-	${CC} -c print.c
+	${CC} -g -c print.c
 
 helpers.o: helpers.c helpers.h
-	$(CC) -c helpers.c
+	$(CC) -g -c helpers.c
 
 clean:
 	rm -f ls *.o

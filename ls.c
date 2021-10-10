@@ -25,10 +25,9 @@
 #include "print.h"
 /*
  TODO:
- run exit status checks
- long format
+ run exit status tests
  fix w option
- recursive option
+ fix -lR option
 */
 /* flags  */
 int A_allentries;        /* Includes all files but current/previous directory  */
@@ -112,7 +111,6 @@ parseargs(int argc, char **argv)
 			case 'l':
 				l_longformat = 1;
 				n_numericalids = 0;
-				s_systemblocks = 1;
 				break;
 			case 'n':
 				n_numericalids = 1;
@@ -265,7 +263,7 @@ formatentry(char* entry, struct stat sb)
 	if (s_systemblocks == 1) {
 		printblocks_s(sb.st_blocks, sb.st_size,  1);
 	}
-	if (l_longformat == 1) {
+	if (n_numericalids == 1 || l_longformat == 1) {
 		printlong_l(entry, sb);
 		return;	
 	}
@@ -360,7 +358,7 @@ formatdir(char* dir)
 				}
 			}
 			blocksum = 0;
-			if (s_systemblocks == 1) {
+			if (l_longformat || n_numericalids || s_systemblocks == 1) {
 				if (entry->fts_level == 0 && (children = fts_children(directory, 0)) != NULL) {
 					blocksum = countblocks(children);
 					printblocks_s(blocksum, blocksum,  0);
@@ -377,15 +375,19 @@ formatdir(char* dir)
 				continue;
 			}
 			blocksum = 0;
+			if (fileinfo == FTS_D) {
+				printf("\n%s\n", entry->fts_path);
+			}
 			if (s_systemblocks == 1) {
 				if ((children = fts_children(directory, 0)) != NULL) {
 					blocksum = countblocks(children);
 					printblocks_s(blocksum, blocksum, 0);
 				}
-				}
-				if (entry->fts_level > 0) {
-					formatentry(entry->fts_name, *entry->fts_statp);
-				}
+				continue;
+			}
+			if (entry->fts_level > 0) {
+				formatentry(entry->fts_name, *entry->fts_statp);
+			}
 		}	
 	}
 	fts_close(directory);
@@ -440,11 +442,13 @@ main(int argc, char **argv)
 				NUMNONDIRS++;
 			}
 		} else {
-			(void)fprintf(stderr, "%s: cannot access %s: No such file or director\n", getprogname(), argv[i]);
+			(void)fprintf(stderr, "%s: cannot access %s: No such file or directory\n", getprogname(), argv[i]);
 			EXIT_STATUS = EXIT_FAILURE;
+			if (i == argc - 1 && i == 1 + argoffset) {
+				exit(EXIT_STATUS);
+			}
 		}
 	}
-
 	if (NUMDIRS > 0 &&  (DIRS = malloc(NUMDIRS * sizeof(char*))) == NULL) {
 		(void)fprintf(stderr, "Memory could not be allocated");
 		exit(EXIT_FAILURE);

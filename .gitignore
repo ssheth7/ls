@@ -2,3 +2,4 @@ ls
 *.swp
 testdir/
 ls.core
+ls-test

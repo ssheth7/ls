@@ -138,7 +138,9 @@ printblocks_s(int blocks, int size, int isEntry)
 		}
 		return;	
 	}
-	
+	if (n_numericalids || l_longformat) {
+		size = blocks * BLOCKSIZE;
+	}
 	humanizeflags = HN_DECIMAL | HN_B | HN_NOSPACE;
 	if (humanize_number(buf, sizeof(buf), size , " ",  HN_AUTOSCALE, humanizeflags) == -1) {
 		(void)fprintf(stderr, "Humanize function failed: %s\n", strerror(errno)); 
@@ -151,60 +153,104 @@ printblocks_s(int blocks, int size, int isEntry)
 	}
 }
 
-// Edit for n option
-// Edit for h, k options
-// Edit for c, u options
 // Make print pretty
+// Add tz compatibility
 void
 printlong_l(char* entry, struct stat sb) 
 {
-	int entrymode, numlinks, currentyear;
+	int invalidgid, invaliduid, humanizeflags;
+	int entrymode, numlinks, len;
+	int currentyear, fileyear;
+	char sizebuf[6];
 	char permbuf[12];
 	char timebuf[13];
-	time_t filetime;
+	char linkbuf[PATH_MAX];
+	char* timeformat;
+	time_t currentepochtime, fileepochtime;
 	uid_t uid;
 	gid_t gid;
-	struct tm *currenttime;
+	struct tm *currenttime, *filetime;
 	struct group *group;
 	struct passwd *passwd;
 	
 	entrymode = sb.st_mode;
 	(void)strmode(entrymode, permbuf);
 	permbuf[11] == '\0';	
+	
 	numlinks = sb.st_nlink;
+	
 	uid = sb.st_uid;
 	gid = sb.st_gid;
-
+	
+	invalidgid = 0;
+	invaliduid = 0;
 	if ((group = getgrgid(gid)) == NULL) {
-		(void)fprintf(stderr, "Could not get guid of %s: %s\n", strerror(errno));
-		EXIT_STATUS = EXIT_FAILURE;
+		invalidgid = 1;
 	} 
 	if ((passwd = getpwuid(uid)) == NULL) {
-		(void)fprintf(stderr, "Could not get pid of %s: %s\n", strerror(errno));
-		EXIT_STATUS = EXIT_FAILURE;
+		invaliduid = 1;
 	}
 
-	filetime = time(NULL);
-	currenttime = localtime(&filetime);
+	currentepochtime = time(NULL);
+	currenttime = localtime(&currentepochtime);
 	currentyear = currenttime->tm_year + 1900;
 	
 	if (c_lastchanged) {
-		filetime = sb.st_ctime;
+		fileepochtime = sb.st_ctime;
 	} else if (u_lastaccess) {
-		filetime = sb.st_atime;
+		fileepochtime = sb.st_atime;
 	} else {
-		filetime = sb.st_mtime;
-	
+		fileepochtime = sb.st_mtime;
 	}
+	filetime = localtime(&fileepochtime);
+	fileyear = filetime->tm_year + 1900;	
 	
-	if (strftime(timebuf, sizeof(timebuf), "%b %d %k:%M", localtime(&filetime)) == 0) {
+	timeformat = "%b %d %k:%M";
+	if (fileyear != currentyear) {
+		timeformat = "%b %d %Y";
+	} 
+	if (strftime(timebuf, sizeof(timebuf), timeformat, filetime) == 0) {
 		fprintf(stderr, "Could not format date of %s.\n", entry); 
 		EXIT_STATUS = EXIT_FAILURE;
 	}
 	timebuf[12] = '\0';
-	printf("%s %d %s %s %d %s %s\n", 
-	permbuf, numlinks, passwd->pw_name, group->gr_name, sb.st_size, timebuf, entry);
 
+	if (h_humanreadable == 1) {
+		humanizeflags = HN_DECIMAL | HN_B | HN_NOSPACE;
+		if (humanize_number(sizebuf, sizeof(sizebuf), sb.st_size , " ",  
+		HN_AUTOSCALE, humanizeflags) == -1) {
+			(void)fprintf(stderr, "Humanize function failed: %s\n", strerror(errno)); 
+			EXIT_STATUS = EXIT_FAILURE;
+		}	
+	} else {
+		snprintf(sizebuf, sizeof(sizebuf), "%d", sb.st_size);
+	}
+	if (n_numericalids == 1) {
+		invalidgid = 1;
+		invaliduid = 1;
+	}
 	
-
+	if (invalidgid == 1 && invaliduid == 0) {
+		printf("%s %d %s %s %s %s %s", 
+		permbuf, numlinks, passwd->pw_name, gid, sizebuf, timebuf, entry);
+	} else if (invalidgid == 0 && invaliduid == 1) {
+		printf("%s %d %d %s %s %s %s", 
+		permbuf, numlinks, uid, group->gr_name, sizebuf, timebuf, entry);
+	} else if (invalidgid == 1 && invaliduid == 1) {
+		printf("%s %d %d %d %s %s %s", 
+		permbuf, numlinks, uid, gid, sizebuf, timebuf, entry);
+	} else {
+		printf("%s %d %s %s %s %s %s", 
+		permbuf, numlinks, passwd->pw_name, group->gr_name, sizebuf, timebuf, entry);
+	}
+	
+	if (S_ISLNK(entrymode)) {
+		if ((len = readlink(entry, linkbuf, sizeof(linkbuf) - 1)) == -1) {
+			fprintf(stderr, "Could not read link: %s\n", strerror(errno));
+			EXIT_STATUS = EXIT_FAILURE;
+		}
+		linkbuf[len] = '\0';
+		printf("-> %s", linkbuf);
+	}	
+	printf("\n");
 }
