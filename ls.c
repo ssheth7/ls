@@ -25,9 +25,7 @@
 #include "print.h"
 /*
  TODO:
- add void to printf/fprintf
  run exit status checks
- improve makefile
  long format
  fix w option
  recursive option
@@ -114,6 +112,7 @@ parseargs(int argc, char **argv)
 			case 'l':
 				l_longformat = 1;
 				n_numericalids = 0;
+				s_systemblocks = 1;
 				break;
 			case 'n':
 				n_numericalids = 1;
@@ -159,7 +158,7 @@ parseargs(int argc, char **argv)
 				q_forcenonprintable = 0;
 				break;
 			default: /* Invalid Argument provided  */
-				fprintf(stderr, "%s [-AacdFfhiklnqRrSstuw] [file ...]\n", getprogname());
+				(void)fprintf(stderr, "%s [-AacdFfhiklnqRrSstuw] [file ...]\n", getprogname());
 				exit(EXIT_FAILURE);
 		}
 	}
@@ -170,17 +169,17 @@ parseargs(int argc, char **argv)
 		if (getenv("BLOCKSIZE") != NULL) {
 			envlength = strlen(getenv("BLOCKSIZE"));
 			if ((blocksize = malloc(envlength * sizeof(char*))) == NULL) {
-				fprintf(stderr, "Could not allocate memory: %s\n", strerror(errno));
+				(void)fprintf(stderr, "Could not allocate memory: %s\n", strerror(errno));
 				exit(EXIT_FAILURE);
 			}
 			blocksize = getenv("BLOCKSIZE");
 			BLOCKSIZE = strtol(blocksize, (char **)NULL, 10);
 			if (BLOCKSIZE < 512) {
-				printf("%s: %ld: minimum blocksize is 512\n", getprogname(), BLOCKSIZE);
+				(void)printf("%s: %ld: minimum blocksize is 512\n", getprogname(), BLOCKSIZE);
 				BLOCKSIZE = 512;
 			}
 			if (BLOCKSIZE > 1074741824) {
-				printf("%s: %ld: maximum blocksize is 1G\n", getprogname(), BLOCKSIZE);
+				(void)printf("%s: %ld: maximum blocksize is 1G\n", getprogname(), BLOCKSIZE);
 				BLOCKSIZE = 1074741824;
 			}
 			//free(blocksize);
@@ -204,15 +203,15 @@ splitargs(int argc, char **argv, int offset)
 	if (NUMDIRS == 0 && NUMNONDIRS == 0) { /* If no command line arguments are provided */
 		NUMDIRS++;
 		if ((DIRS = malloc(NUMDIRS * sizeof(char*))) == NULL) {
-			fprintf(stderr, "Memory could not be allocated");
+			(void)fprintf(stderr, "Memory could not be allocated");
 			exit(EXIT_FAILURE);
 		}
 		if ((DIRS[0] = malloc(strlen(".") + 1)) == NULL) {
-			fprintf(stderr, "Could not allocate memory.\n");
+			(void)fprintf(stderr, "Could not allocate memory.\n");
 			exit(EXIT_FAILURE);
 		}
 		if (strncpy(DIRS[0], ".", strlen(".")) == NULL) {
-			fprintf(stderr, "Could not copy to destination\n");
+			(void)fprintf(stderr, "Could not copy to destination\n");
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -222,24 +221,24 @@ splitargs(int argc, char **argv, int offset)
 			arglength = strlen(argv[i]);
 			if (S_ISDIR(sb.st_mode)) {
 				if ((DIRS[dirindex] = malloc(arglength + 1)) == NULL) {
-					fprintf(stderr, "Could not allocate memory.\n");
+					(void)fprintf(stderr, "Could not allocate memory.\n");
 				}
 				if (strncpy(DIRS[dirindex], argv[i], arglength) == NULL) {
-					fprintf(stderr, "Could not copy %s to buffer.\n", argv[i]);
+					(void)fprintf(stderr, "Could not copy %s to buffer.\n", argv[i]);
 				}
 				dirindex++;
 			} else {
 				if ((NONDIRS[nondirindex] = malloc(arglength + 1)) == NULL) {
-					fprintf(stderr, "Could not allocate memory.\n");
+					(void)fprintf(stderr, "Could not allocate memory.\n");
 				}
 				
 				if (strncpy(NONDIRS[nondirindex], argv[i], arglength) == NULL) {
-					fprintf(stderr, "Could not copy %s to buffer.\n", argv[i]);
+					(void)fprintf(stderr, "Could not copy %s to buffer.\n", argv[i]);
 				}
 				nondirindex++;
 			}
 		} else {
-			fprintf(stderr, "%s: cannot access %s: No such file or director\n", getprogname(), argv[i]);
+			(void)fprintf(stderr, "%s: cannot access %s: No such file or director\n", getprogname(), argv[i]);
 			EXIT_STATUS = EXIT_FAILURE;
 		}
 	}
@@ -253,22 +252,26 @@ formatentry(char* entry, struct stat sb)
 {
 	int printallflags = A_allentries || a_allentries;
 	
-	if (!printallflags && entry[0] == '.') {
+	if (printallflags == 0 && entry[0] == '.') {
 		return;
 	}
 	
-	if (F_specialsymbols) {
+	if (F_specialsymbols == 1) {
 		addsymbols_F(&entry, sb);
 	}
-	if (i_inodes) {
+	if (i_inodes == 1) {
 		printinode_i(sb);
 	} 
-	if (s_systemblocks) {
-		printblocks_s(sb);
+	if (s_systemblocks == 1) {
+		printblocks_s(sb.st_blocks, sb.st_size,  1);
 	}
-	if (w_forcenonprintable) {
+	if (l_longformat == 1) {
+		printlong_l(entry, sb);
+		return;	
+	}
+	if (w_forcenonprintable == 1) {
 		printraw_w(entry);
-	} else if (q_forcenonprintable) {
+	} else if (q_forcenonprintable == 1) {
 		printraw_q(entry);
 	} else {
 		printdefault(entry);
@@ -332,14 +335,14 @@ formatdir(char* dir)
 		ftsopenflags |= FTS_SEEDOT;
 	}
 	if ((dirptr[0] = malloc(strlen(dir) + 1)) == NULL) {
-		fprintf(stderr, "Could not allocate memory.\n");
+		(void)fprintf(stderr, "Could not allocate memory.\n");
 		exit(EXIT_FAILURE);
 	}	
 	dirptr[0] = dir;
 	dirptr[1] = NULL;
 	
 	if ((directory = fts_open(dirptr, ftsopenflags, comparefunction)) == NULL) {
-		fprintf(stderr, "Cannot open %s.\n", dir);
+		(void)fprintf(stderr, "Cannot open %s.\n", dir);
 		EXIT_STATUS = EXIT_FAILURE;
 		return;
 	}
@@ -351,7 +354,7 @@ formatdir(char* dir)
 			}
 			if (entry->fts_level > 0  && fileinfo == FTS_D) {
 				if (fts_set(directory, entry, FTS_SKIP) != 0) {
-					fprintf(stderr, "Could not set fts options.\n");
+					(void)fprintf(stderr, "Could not set fts options.\n");
 					EXIT_STATUS = 1;
 					continue;
 				}
@@ -360,7 +363,7 @@ formatdir(char* dir)
 			if (s_systemblocks == 1) {
 				if (entry->fts_level == 0 && (children = fts_children(directory, 0)) != NULL) {
 					blocksum = countblocks(children);
-					formatblocks(blocksum);
+					printblocks_s(blocksum, blocksum,  0);
 				}
 			}
 			if (entry->fts_level > 0) {
@@ -377,8 +380,8 @@ formatdir(char* dir)
 			if (s_systemblocks == 1) {
 				if ((children = fts_children(directory, 0)) != NULL) {
 					blocksum = countblocks(children);
-					formatblocks(blocksum);
-					}
+					printblocks_s(blocksum, blocksum, 0);
+				}
 				}
 				if (entry->fts_level > 0) {
 					formatentry(entry->fts_name, *entry->fts_statp);
@@ -437,19 +440,19 @@ main(int argc, char **argv)
 				NUMNONDIRS++;
 			}
 		} else {
-			fprintf(stderr, "%s: cannot access %s: No such file or director\n", getprogname(), argv[i]);
+			(void)fprintf(stderr, "%s: cannot access %s: No such file or director\n", getprogname(), argv[i]);
 			EXIT_STATUS = EXIT_FAILURE;
 		}
 	}
 
 	if (NUMDIRS > 0 &&  (DIRS = malloc(NUMDIRS * sizeof(char*))) == NULL) {
-		fprintf(stderr, "Memory could not be allocated");
+		(void)fprintf(stderr, "Memory could not be allocated");
 		exit(EXIT_FAILURE);
 	}
 
 
 	if (NUMNONDIRS > 0 && (NONDIRS = malloc(NUMNONDIRS * sizeof(char*))) == NULL) {
-		fprintf(stderr, "Memory could not be allocated");
+		(void)fprintf(stderr, "Memory could not be allocated");
 		exit(EXIT_FAILURE);
 	}
 
@@ -461,7 +464,7 @@ main(int argc, char **argv)
 	/* Prints non directory entries and then directory entries */	
 	for (i = 0; i < NUMNONDIRS; i++) {
 		if (stat(NONDIRS[i], &sb) != 0) {
-			fprintf(stderr, "%s: cannot access %s: No such file or directory.\n", getprogname(), NONDIRS[i]);
+			(void)fprintf(stderr, "%s: cannot access %s: No such file or directory.\n", getprogname(), NONDIRS[i]);
 			continue;
 		}
 		formatentry(NONDIRS[i], sb);
@@ -470,19 +473,20 @@ main(int argc, char **argv)
 	for (i = 0; i < NUMDIRS; i++) {
 		
 		if (stat(DIRS[i], &sb) != 0) {
-			fprintf(stderr, "%s: cannot access %s: No such file or directory.\n", getprogname(), DIRS[i]);
+			(void)fprintf(stderr, "%s: cannot access %s: No such file or directory.\n", getprogname(), DIRS[i]);
 			continue;
 		}
 		if (NUMDIRS + NUMNONDIRS > 1) {
 			if (i > 0) {
-				printf("\n");
+				(void)printf("\n");
 			}
-			printf("%s:\n", DIRS[i]);
+			(void)printf("%s:\n", DIRS[i]);
 		
 		}
 		formatdir(DIRS[i]);
 	}
 
 	cleanup(DIRS, NONDIRS);
+	printf("Program exited with status: %d\n", EXIT_STATUS);
 	exit(EXIT_STATUS);
 }

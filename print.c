@@ -6,10 +6,14 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <grp.h>
 #include <math.h>
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <unistd.h>
 
 #include "print.h"
 
@@ -34,7 +38,9 @@ extern int s_systemblocks;      /* Shows number of blocks used  */
 extern int t_modifiedsorted;    /* Sort by time modified */                               
 extern int u_lastaccess;        /* Shows time of last access  */                          
 extern int w_forcenonprintable; /* Forces raw nonprintable characters  */ 
+
 extern int BLOCKSIZE;
+extern int EXIT_STATUS;
 
 #define CEIL(w, x, y) (1 + (w - 1)/(x / y))
 
@@ -46,7 +52,7 @@ addsymbols_F(char** entry, struct stat sb)
 	char* modifiedentry;
 	
 	if ((modifiedentry = malloc(strlen(*entry) + 2)) == NULL) {
-		fprintf(stderr, "Could not allocate memory: %s\n", strerror(errno));
+		(void)fprintf(stderr, "Could not allocate memory: %s\n", strerror(errno));
 	}
 	
 	entrymode = sb.st_mode;
@@ -75,7 +81,7 @@ addsymbols_F(char** entry, struct stat sb)
 void
 printdefault(char* entry)
 {
-	printf("%s\n", entry);
+	(void)printf("%s\n", entry);
 }
 
 void
@@ -87,13 +93,13 @@ printraw_q(char* entry)
 
 	while(entry[index]) {
 		if (isprint(entry[index])) {
-			printf("%c", entry[index]);
+			(void)printf("%c", entry[index]);
 		} else {
-			printf("?");
+			(void)printf("?");
 		}
 		index++;
 	}
-	printf("\n");
+	(void)printf("\n");
 }
 
 void
@@ -104,59 +110,101 @@ printraw_w(char* entry)
 	index = 0;
 	while(entry[index]) {
 		if (isprint(entry[index])) {
-			printf("%c", entry[index]);
+			(void)printf("%c", entry[index]);
 		} else {
-			printf("%c", entry[index]);
+			(void)printf("%c", entry[index]);
 		}
 		index++;
 	}
-	printf("\n");
+	(void)printf("\n");
 }
 
 void
 printinode_i(struct stat sb) 
 {
-	printf("%ld ", sb.st_ino);
+	(void)printf("%ld ", sb.st_ino);
 }
 
 void
-printblocks_s(struct stat sb)
+printblocks_s(int blocks, int size, int isEntry)
 {
-	float blocks;
-	blocks = sb.st_blocks;
-	
+	int humanizeflags;
+	char buf[6];
 	if (!h_humanreadable) {
-		blocks = CEIL(blocks, BLOCKSIZE, 512);
-		printf("total %f\n", blocks);
+		if (isEntry == 1) {
+			(void)printf("%d ", CEIL(blocks, BLOCKSIZE, 512));
+		} else {
+			(void)printf("total %d\n", CEIL(blocks, BLOCKSIZE, 512));
+		}
 		return;	
 	}
-	blocks = sb.st_size;
-	if ((humanize_number()	
-}
-
-
-void
-formatblocks(int blocksum) {
-	if (!h_humanreadable) {
-		if (blocksum < BLOCKSIZE / 512) {
-			blocksum = 1;
-		} else {
-			blocksum = CEIL(blocksum, BLOCKSIZE, 512);
-		}
-		printf("total %d\n", blocksum);
-		return;
-	} 
-	if (blocksum < KILOBYTE) {
-		printf("total %dB\n", blocksum);
-	} else if (blocksum < MEGABYTE) {
-		blocksum /= KILOBYTE;
-		printf("total %dK\n", blocksum);
-	} else if (blocksum < GIGABYTE) {
-		blocksum /= MEGABYTE;
-		printf("total %dM\n", blocksum);
+	
+	humanizeflags = HN_DECIMAL | HN_B | HN_NOSPACE;
+	if (humanize_number(buf, sizeof(buf), size , " ",  HN_AUTOSCALE, humanizeflags) == -1) {
+		(void)fprintf(stderr, "Humanize function failed: %s\n", strerror(errno)); 
+		EXIT_STATUS = EXIT_FAILURE;
+	}
+	if (isEntry == 1) {
+		(void)printf("%s ", buf);
 	} else {
-		blocksum /= GIGABYTE;
-		printf("total %dG\n", blocksum);
+		(void)printf("total %s\n", buf);
 	}
 }
 
+// Edit for n option
+// Edit for h, k options
+// Edit for c, u options
+// Make print pretty
+void
+printlong_l(char* entry, struct stat sb) 
+{
+	int entrymode, numlinks, currentyear;
+	char permbuf[12];
+	char timebuf[13];
+	time_t filetime;
+	uid_t uid;
+	gid_t gid;
+	struct tm *currenttime;
+	struct group *group;
+	struct passwd *passwd;
+	
+	entrymode = sb.st_mode;
+	(void)strmode(entrymode, permbuf);
+	permbuf[11] == '\0';	
+	numlinks = sb.st_nlink;
+	uid = sb.st_uid;
+	gid = sb.st_gid;
+
+	if ((group = getgrgid(gid)) == NULL) {
+		(void)fprintf(stderr, "Could not get guid of %s: %s\n", strerror(errno));
+		EXIT_STATUS = EXIT_FAILURE;
+	} 
+	if ((passwd = getpwuid(uid)) == NULL) {
+		(void)fprintf(stderr, "Could not get pid of %s: %s\n", strerror(errno));
+		EXIT_STATUS = EXIT_FAILURE;
+	}
+
+	filetime = time(NULL);
+	currenttime = localtime(&filetime);
+	currentyear = currenttime->tm_year + 1900;
+	
+	if (c_lastchanged) {
+		filetime = sb.st_ctime;
+	} else if (u_lastaccess) {
+		filetime = sb.st_atime;
+	} else {
+		filetime = sb.st_mtime;
+	
+	}
+	
+	if (strftime(timebuf, sizeof(timebuf), "%b %d %k:%M", localtime(&filetime)) == 0) {
+		fprintf(stderr, "Could not format date of %s.\n", entry); 
+		EXIT_STATUS = EXIT_FAILURE;
+	}
+	timebuf[12] = '\0';
+	printf("%s %d %s %s %d %s %s\n", 
+	permbuf, numlinks, passwd->pw_name, group->gr_name, sb.st_size, timebuf, entry);
+
+	
+
+}
