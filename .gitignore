@@ -3,3 +3,4 @@ ls
 testdir/
 ls.core
 ls-test
+*.o

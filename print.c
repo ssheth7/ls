@@ -138,7 +138,7 @@ printblocks_s(int blocks, int size, int isEntry)
 		}
 		return;	
 	}
-	if (n_numericalids || l_longformat) {
+	if ((n_numericalids || l_longformat) && isEntry) {
 		size = blocks * BLOCKSIZE;
 	}
 	humanizeflags = HN_DECIMAL | HN_B | HN_NOSPACE;
@@ -215,35 +215,38 @@ printlong_l(char* entry, struct stat sb)
 	}
 	timebuf[12] = '\0';
 
-	if (h_humanreadable == 1) {
-		humanizeflags = HN_DECIMAL | HN_B | HN_NOSPACE;
-		if (humanize_number(sizebuf, sizeof(sizebuf), sb.st_size , " ",  
-		HN_AUTOSCALE, humanizeflags) == -1) {
-			(void)fprintf(stderr, "Humanize function failed: %s\n", strerror(errno)); 
-			EXIT_STATUS = EXIT_FAILURE;
-		}	
-	} else {
-		snprintf(sizebuf, sizeof(sizebuf), "%d", sb.st_size);
-	}
 	if (n_numericalids == 1) {
 		invalidgid = 1;
 		invaliduid = 1;
 	}
 	
 	if (invalidgid == 1 && invaliduid == 0) {
-		printf("%s %d %s %s %s %s %s", 
-		permbuf, numlinks, passwd->pw_name, gid, sizebuf, timebuf, entry);
+		printf("%s %d %s %s ", 
+		permbuf, numlinks, passwd->pw_name, gid);
 	} else if (invalidgid == 0 && invaliduid == 1) {
-		printf("%s %d %d %s %s %s %s", 
-		permbuf, numlinks, uid, group->gr_name, sizebuf, timebuf, entry);
+		printf("%s %d %d %s ", 
+		permbuf, numlinks, uid, group->gr_name);
 	} else if (invalidgid == 1 && invaliduid == 1) {
-		printf("%s %d %d %d %s %s %s", 
-		permbuf, numlinks, uid, gid, sizebuf, timebuf, entry);
+		printf("%s %d %d %d ", 
+		permbuf, numlinks, uid, gid);
 	} else {
-		printf("%s %d %s %s %s %s %s", 
-		permbuf, numlinks, passwd->pw_name, group->gr_name, sizebuf, timebuf, entry);
+		printf("%s %d %s %s ", 
+		permbuf, numlinks, passwd->pw_name, group->gr_name);
 	}
 	
+	if (h_humanreadable == 1) {
+		humanizeflags = HN_DECIMAL | HN_B | HN_NOSPACE;
+		if (humanize_number(sizebuf, sizeof(sizebuf), sb.st_size , " ",  
+		HN_AUTOSCALE, humanizeflags) == -1) {
+			(void)fprintf(stderr, "Humanize function failed: %s\n", strerror(errno)); 
+			EXIT_STATUS = EXIT_FAILURE;
+		}
+		printf("%s ", sizebuf);	
+	} else {
+		printf("%d ", sb.st_size);
+	}
+	
+	printf("%s %s", timebuf, entry);
 	if (S_ISLNK(entrymode)) {
 		if ((len = readlink(entry, linkbuf, sizeof(linkbuf) - 1)) == -1) {
 			fprintf(stderr, "Could not read link: %s\n", strerror(errno));

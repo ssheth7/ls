@@ -369,24 +369,24 @@ formatdir(char* dir)
 			}
 		}	
 	} else {
-		while(R_recurse == 1 && (entry = fts_read(directory)) != NULL) {
+		while((entry = fts_read(directory)) != NULL) {
 			fileinfo = entry->fts_info;
 			if (fileinfo == FTS_DP) {
 				continue;
 			}
 			blocksum = 0;
 			if (fileinfo == FTS_D) {
-				printf("\n%s\n", entry->fts_path);
+				printf("\n%s:\n", entry->fts_path);
+				
 			}
-			if (s_systemblocks == 1) {
+			if (l_longformat || n_numericalids || s_systemblocks == 1) {
 				if ((children = fts_children(directory, 0)) != NULL) {
 					blocksum = countblocks(children);
 					printblocks_s(blocksum, blocksum, 0);
 				}
-				continue;
 			}
 			if (entry->fts_level > 0) {
-				formatentry(entry->fts_name, *entry->fts_statp);
+				printf("entry: %s: " ,entry->fts_name);formatentry(entry->fts_name, *entry->fts_statp);
 			}
 		}	
 	}
