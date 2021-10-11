@@ -154,9 +154,8 @@ printblocks_s(int blocks, int size, int isEntry)
 }
 
 // Make print pretty
-// Add tz compatibility
 void
-printlong_l(char* entry, struct stat sb) 
+printlong_l(char* entry, char* path, struct stat sb) 
 {
 	int invalidgid, invaliduid, humanizeflags;
 	int entrymode, numlinks, len;
@@ -247,8 +246,17 @@ printlong_l(char* entry, struct stat sb)
 	}
 	
 	printf("%s %s", timebuf, entry);
+	char *fullpath;
+	if ((fullpath = malloc(strlen(path) + strlen(entry) + 2)) == NULL) {
+		(void)fprintf(stderr, "Cannot allocate memory: %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	strcpy(fullpath, path);
+	strcat(fullpath, "/");
+	strcat(fullpath, entry);
+	
 	if (S_ISLNK(entrymode)) {
-		if ((len = readlink(entry, linkbuf, sizeof(linkbuf) - 1)) == -1) {
+		if ((len = readlink(fullpath, linkbuf, sizeof(linkbuf) - 1)) == -1) {
 			//fprintf(stderr, "Could not read link: %s\n", strerror(errno));
 			//EXIT_STATUS = EXIT_FAILURE;
 		}

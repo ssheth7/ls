@@ -4,9 +4,12 @@
 #include <sys/stat.h>
 
 #include <dirent.h>
+#include <errno.h>
 #include <fts.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "helpers.h"
 #include "ls.h"
@@ -40,7 +43,7 @@ getimmediatechildren(FTSENT* children, int parentlevel)
 {
 	while(children != NULL) {
 		if (children->fts_level == parentlevel + 1) {
-			formatentry(children->fts_name, *children->fts_statp);
+			formatentry(children->fts_name, children->fts_path,  *children->fts_statp);
 		}
 		children = children->fts_link;
 	}

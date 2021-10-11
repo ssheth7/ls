@@ -10,6 +10,6 @@ void printraw_q(char*);
 void printraw_w(char*);
 void printinode_i(struct stat);
 void printblocks_s(int, int, int);
-void printlong_l(char*, struct stat);
+void printlong_l(char*, char*, struct stat);
 #endif /* !_PRINT_H_ */
 

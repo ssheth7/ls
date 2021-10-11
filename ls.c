@@ -15,6 +15,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fts.h>
+#include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,7 +28,7 @@
  TODO:
  run exit status tests
  fix w option
- fix -lR option
+ fix -lR, -lairt, option
 */
 /* flags  */
 int A_allentries;        /* Includes all files but current/previous directory  */
@@ -217,7 +218,7 @@ splitargs(int argc, char **argv, int offset)
 	for (i = 1 + offset; i < argc; i++){
 		if (stat(argv[i], &sb) == 0) {
 			arglength = strlen(argv[i]);
-			if (S_ISDIR(sb.st_mode)) {
+			if (S_ISDIR(sb.st_mode) && d_directories == 0) {
 				if ((DIRS[dirindex] = malloc(arglength + 1)) == NULL) {
 					(void)fprintf(stderr, "Could not allocate memory.\n");
 				}
@@ -246,11 +247,11 @@ splitargs(int argc, char **argv, int offset)
  * Reads flags and called corresponding print functions 
 */
 void
-formatentry(char* entry, struct stat sb)
+formatentry(char* entry, char* path, struct stat sb)
 {
 	int printallflags = A_allentries || a_allentries;
 	
-	if (printallflags == 0 && entry[0] == '.') {
+	if (d_directories ==0 && printallflags == 0 && entry[0] == '.') {
 		return;
 	}
 	
@@ -264,7 +265,7 @@ formatentry(char* entry, struct stat sb)
 		printblocks_s(sb.st_blocks, sb.st_size,  1);
 	}
 	if (n_numericalids == 1 || l_longformat == 1) {
-		printlong_l(entry, sb);
+		printlong_l(entry, path,  sb);
 		return;	
 	}
 	if (w_forcenonprintable == 1) {
@@ -365,7 +366,7 @@ formatdir(char* dir)
 				}
 			}
 			if (entry->fts_level > 0) {
-				formatentry(entry->fts_name, *entry->fts_statp);
+				formatentry(entry->fts_name, entry->fts_path, *entry->fts_statp);
 			}
 		}	
 	} else {
@@ -444,7 +445,7 @@ main(int argc, char **argv)
  	/* Counts the number of nondirs and dirs arguments given */		
 	for (i = 1 + argoffset; i < argc; i++){
 		if (stat(argv[i], &sb) == 0) {
-			if (S_ISDIR(sb.st_mode)) {
+			if (S_ISDIR(sb.st_mode) && d_directories == 0) {
 				NUMDIRS++;
 			} else {
 				NUMNONDIRS++;
@@ -479,7 +480,7 @@ main(int argc, char **argv)
 			(void)fprintf(stderr, "%s: cannot access %s: No such file or directory.\n", getprogname(), NONDIRS[i]);
 			continue;
 		}
-		formatentry(NONDIRS[i], sb);
+		formatentry(NONDIRS[i], dirname(NONDIRS[i]), sb);
 	}
 
 	for (i = 0; i < NUMDIRS; i++) {
@@ -495,7 +496,7 @@ main(int argc, char **argv)
 			(void)printf("%s:\n", DIRS[i]);
 		
 		}
-		formatdir(DIRS[i]);
+			formatdir(DIRS[i]); 
 	}
 
 	cleanup(DIRS, NONDIRS);
