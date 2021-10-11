@@ -283,10 +283,10 @@ formatentry(char* entry, struct stat sb)
 void
 formatdir(char* dir) 
 {
-	int blocksum, fileinfo;
-	int ftsopenflags;
+	int blocksum, currentlevel, fileinfo;
+	int ftsopenflags, printallflags, ignoredflag;
 	char *dirptr[2];
-	FTSENT *children, *entry;
+	FTSENT *blockchildren, *entry, *recursivechildren;
 	FTS *directory;
 	
 	
@@ -358,9 +358,9 @@ formatdir(char* dir)
 				}
 			}
 			blocksum = 0;
-			if (l_longformat || n_numericalids || s_systemblocks == 1) {
-				if (entry->fts_level == 0 && (children = fts_children(directory, 0)) != NULL) {
-					blocksum = countblocks(children);
+			if (l_longformat ==1 || n_numericalids == 1|| s_systemblocks == 1) {
+				if (entry->fts_level == 0 && (blockchildren = fts_children(directory, 0)) != NULL) {
+					blocksum = countblocks(blockchildren);
 					printblocks_s(blocksum, blocksum,  0);
 				}
 			}
@@ -369,24 +369,32 @@ formatdir(char* dir)
 			}
 		}	
 	} else {
+		printallflags = A_allentries || a_allentries;
 		while((entry = fts_read(directory)) != NULL) {
 			fileinfo = entry->fts_info;
 			if (fileinfo == FTS_DP) {
 				continue;
 			}
+			currentlevel = entry->fts_level;
 			blocksum = 0;
+			ignoredflag = 0;
+			if (printallflags == 0 && strncmp(entry->fts_name, ".", 1) == 0 && currentlevel != 0) { 
+				ignoredflag = 1;
+			}
 			if (fileinfo == FTS_D) {
-				printf("\n%s:\n", entry->fts_path);
+				if (ignoredflag == 0) {
+					printf("\n%s:\n", entry->fts_path);
+				}
 				
 			}
-			if (l_longformat || n_numericalids || s_systemblocks == 1) {
-				if ((children = fts_children(directory, 0)) != NULL) {
-					blocksum = countblocks(children);
-					printblocks_s(blocksum, blocksum, 0);
+			if (ignoredflag == 0 && (l_longformat == 1|| n_numericalids == 1 || s_systemblocks == 1)) {
+				if ((blockchildren = fts_children(directory, 0)) != NULL) {
+					blocksum = countblocks(blockchildren);
+					printblocks_s(blocksum, blocksum,  0);
 				}
 			}
-			if (entry->fts_level > 0) {
-				printf("entry: %s: " ,entry->fts_name);formatentry(entry->fts_name, *entry->fts_statp);
+			if ((recursivechildren = fts_children(directory, 0)) != NULL) {	
+				getimmediatechildren(recursivechildren, currentlevel);
 			}
 		}	
 	}

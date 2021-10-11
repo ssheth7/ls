@@ -33,6 +33,19 @@ extern int t_modifiedsorted;    /* Sort by time modified */
 extern int u_lastaccess;        /* Shows time of last access  */                          
 extern int w_forcenonprintable; /* Forces raw nonprintable characters  */ 
 
+
+// -lR does not print link destinations
+void
+getimmediatechildren(FTSENT* children, int parentlevel)
+{
+	while(children != NULL) {
+		if (children->fts_level == parentlevel + 1) {
+			formatentry(children->fts_name, *children->fts_statp);
+		}
+		children = children->fts_link;
+	}
+}
+
 int 
 countblocks(FTSENT *children)
 {

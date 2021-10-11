@@ -221,7 +221,7 @@ printlong_l(char* entry, struct stat sb)
 	}
 	
 	if (invalidgid == 1 && invaliduid == 0) {
-		printf("%s %d %s %s ", 
+		printf("%s %d %s %d ", 
 		permbuf, numlinks, passwd->pw_name, gid);
 	} else if (invalidgid == 0 && invaliduid == 1) {
 		printf("%s %d %d %s ", 
@@ -249,11 +249,12 @@ printlong_l(char* entry, struct stat sb)
 	printf("%s %s", timebuf, entry);
 	if (S_ISLNK(entrymode)) {
 		if ((len = readlink(entry, linkbuf, sizeof(linkbuf) - 1)) == -1) {
-			fprintf(stderr, "Could not read link: %s\n", strerror(errno));
-			EXIT_STATUS = EXIT_FAILURE;
+			//fprintf(stderr, "Could not read link: %s\n", strerror(errno));
+			//EXIT_STATUS = EXIT_FAILURE;
 		}
 		linkbuf[len] = '\0';
 		printf("-> %s", linkbuf);
 	}	
 	printf("\n");
 }
+

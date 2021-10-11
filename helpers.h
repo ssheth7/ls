@@ -7,6 +7,7 @@
 #include <limits.h>
 #include <string.h>
 
+void getimmediatechildren(FTSENT*, int);
 int countblocks(FTSENT*);
 int lexicosort(const void*, const void*);
 
