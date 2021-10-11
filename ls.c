@@ -27,8 +27,7 @@
 /*
  TODO:
  run exit status tests
- fix w option
- fix -lR, -lairt, option
+ format style
 */
 /* flags  */
 int A_allentries;        /* Includes all files but current/previous directory  */
@@ -49,12 +48,11 @@ int S_sizesorted;        /* Sorts by size */
 int s_systemblocks;      /* Shows number of blocks used  */                        
 int t_modifiedsorted;    /* Sort by time modified */                               
 int u_lastaccess;        /* Shows time of last access  */                          
-int w_forcenonprintable; /* Forces raw nonprintable characters  */ 
 
 long BLOCKSIZE;		 /* BLOCKSIZE env variable  */
+int EXIT_STATUS; 
 int NUMDIRS; 		 /* Number of directory arguments  */
 int NUMNONDIRS; 	 /* Number of non-dirextory arguments */
-int EXIT_STATUS; 
 char **DIRS;   		 /* String array of directory arguments */
 char **NONDIRS; 	 /* String array of non-directory arguments */
 
@@ -68,6 +66,9 @@ parseargs(int argc, char **argv)
 	int opt, flagsset, envlength;
 	char* blocksize;
 		
+	if (isatty(1)) {
+		q_forcenonprintable = 1;	
+	} 
 	BLOCKSIZE = 512;
 	flagsset = 0;
 	while ((opt = getopt(argc, argv, "AacdFfhiklnqRrSstuw")) != -1) {
@@ -119,7 +120,6 @@ parseargs(int argc, char **argv)
 				break;
 			case 'q':
 				q_forcenonprintable = 1;
-				w_forcenonprintable = 0;
 				break;
 			case 'R':
 				R_recurse = 1;
@@ -140,7 +140,7 @@ parseargs(int argc, char **argv)
 				s_systemblocks = 1;
 				break;
 			case 't':
-				if (f_unsorted == 0) {
+				if (f_unsorted == 1) {
 					break;
 				}
 				t_modifiedsorted = 1;
@@ -153,7 +153,6 @@ parseargs(int argc, char **argv)
 				c_lastchanged = 0;
 				break;
 			case 'w':
-				w_forcenonprintable = 1;
 				q_forcenonprintable = 0;
 				break;
 			default: /* Invalid Argument provided  */
@@ -181,7 +180,6 @@ parseargs(int argc, char **argv)
 				(void)printf("%s: %ld: maximum blocksize is 1G\n", getprogname(), BLOCKSIZE);
 				BLOCKSIZE = 1074741824;
 			}
-			//free(blocksize);
 		} 
 		
 	}
@@ -200,22 +198,39 @@ splitargs(int argc, char **argv, int offset)
 	nondirindex = 0;
 	
 	if (NUMDIRS == 0 && NUMNONDIRS == 0) { /* If no command line arguments are provided */
-		NUMDIRS++;
-		if ((DIRS = malloc(NUMDIRS * sizeof(char*))) == NULL) {
-			(void)fprintf(stderr, "Memory could not be allocated");
-			exit(EXIT_FAILURE);
-		}
-		if ((DIRS[0] = malloc(strlen(".") + 1)) == NULL) {
-			(void)fprintf(stderr, "Could not allocate memory.\n");
-			exit(EXIT_FAILURE);
-		}
-		if (strncpy(DIRS[0], ".", strlen(".")) == NULL) {
-			(void)fprintf(stderr, "Could not copy to destination\n");
-			exit(EXIT_FAILURE);
+		if (d_directories == 0){
+			NUMDIRS++;
+			if ((DIRS = malloc(NUMDIRS * sizeof(char*))) == NULL) {
+				(void)fprintf(stderr, "Memory could not be allocated");
+				exit(EXIT_FAILURE);
+			}
+			if ((DIRS[0] = malloc(strlen(".") + 1)) == NULL) {
+				(void)fprintf(stderr, "Could not allocate memory.\n");
+				exit(EXIT_FAILURE);
+			}
+			if (strncpy(DIRS[0], ".", strlen(".")) == NULL) {
+				(void)fprintf(stderr, "Could not copy to destination\n");
+				exit(EXIT_FAILURE);
+			}
+		} else {
+			NUMNONDIRS++;
+			if ((NONDIRS = malloc(NUMNONDIRS * sizeof(char*))) == NULL) {
+				(void)fprintf(stderr, "Memory could not be allocated");
+				exit(EXIT_FAILURE);
+			}
+			if ((NONDIRS[0] = malloc(strlen(".") + 1)) == NULL) {
+				(void)fprintf(stderr, "Could not allocate memory.\n");
+				exit(EXIT_FAILURE);
+			}
+			if (strncpy(NONDIRS[0], ".", strlen(".")) == NULL) {
+				(void)fprintf(stderr, "Could not copy to destination\n");
+				exit(EXIT_FAILURE);
+			}
 		}
 	}
 	
 	for (i = 1 + offset; i < argc; i++){
+
 		if (stat(argv[i], &sb) == 0) {
 			arglength = strlen(argv[i]);
 			if (S_ISDIR(sb.st_mode) && d_directories == 0) {
@@ -266,11 +281,7 @@ formatentry(char* entry, char* path, struct stat sb)
 	}
 	if (n_numericalids == 1 || l_longformat == 1) {
 		printlong_l(entry, path,  sb);
-		return;	
-	}
-	if (w_forcenonprintable == 1) {
-		printraw_w(entry);
-	} else if (q_forcenonprintable == 1) {
+	}  else if (q_forcenonprintable == 1) {
 		printraw_q(entry);
 	} else {
 		printdefault(entry);
@@ -285,7 +296,7 @@ void
 formatdir(char* dir) 
 {
 	int blocksum, currentlevel, fileinfo;
-	int ftsopenflags, printallflags, ignoredflag;
+	int ftsopenflags, printallflags, ignoredflag, outputflag;
 	char *dirptr[2];
 	FTSENT *blockchildren, *entry, *recursivechildren;
 	FTS *directory;
@@ -295,43 +306,46 @@ formatdir(char* dir)
 	
 	comparefunction = &fts_lexicosort;
 	
-	if (r_reverseorder) {
+	if (r_reverseorder == 1) {
 		comparefunction = &fts_rlexicosort;
 	}
 	
-	if (S_sizesorted) {
+	if (S_sizesorted == 1) {
 		comparefunction = &fts_sizesort;
-		if (r_reverseorder) {
+		if (r_reverseorder == 1) {
 			comparefunction = &fts_rsizesort;
 		}
 	}
 
-	if (t_modifiedsorted) {
+	if (t_modifiedsorted == 1) {
 		comparefunction = &fts_timemodifiedsort;
-		if (r_reverseorder) {
+		if (r_reverseorder == 1) {
 			comparefunction = &fts_rtimemodifiedsort;
 		}
 	}
 	
-	if (t_modifiedsorted && u_lastaccess) {
+	if (t_modifiedsorted == 1 && u_lastaccess == 1) {
 		comparefunction = &fts_lastaccesssort;
-		if (r_reverseorder) {
+		if (r_reverseorder == 1) {
 			comparefunction = &fts_rlastaccesssort;
 		}
 	}
-	if (t_modifiedsorted && c_lastchanged) {
+	if (t_modifiedsorted == 1 && c_lastchanged == 1) {
 		comparefunction = &fts_statuschangesort;
-		if (r_reverseorder) { 
+		if (r_reverseorder == 1) { 
 			comparefunction = &fts_rstatuschangesort;
 		}
 	}
-	if (f_unsorted) {
+	if (f_unsorted == 1) {
 		comparefunction = NULL;	
 	}
 	
 	ftsopenflags = FTS_COMFOLLOW;
 	if (a_allentries == 1) {
 		ftsopenflags |= FTS_SEEDOT;
+	}
+	if (R_recurse == 1) {
+		ftsopenflags |= FTS_NOCHDIR;
 	}
 	if ((dirptr[0] = malloc(strlen(dir) + 1)) == NULL) {
 		(void)fprintf(stderr, "Could not allocate memory.\n");
@@ -359,7 +373,7 @@ formatdir(char* dir)
 				}
 			}
 			blocksum = 0;
-			if (l_longformat ==1 || n_numericalids == 1|| s_systemblocks == 1) {
+			if (l_longformat ==1 || n_numericalids == 1|| s_systemblocks == 1 || isatty(1) == 0) {
 				if (entry->fts_level == 0 && (blockchildren = fts_children(directory, 0)) != NULL) {
 					blocksum = countblocks(blockchildren);
 					printblocks_s(blocksum, blocksum,  0);
@@ -371,6 +385,8 @@ formatdir(char* dir)
 		}	
 	} else {
 		printallflags = A_allentries || a_allentries;
+		outputflag = 0;
+
 		while((entry = fts_read(directory)) != NULL) {
 			fileinfo = entry->fts_info;
 			if (fileinfo == FTS_DP) {
@@ -383,18 +399,20 @@ formatdir(char* dir)
 				ignoredflag = 1;
 			}
 			if (fileinfo == FTS_D) {
-				if (ignoredflag == 0) {
+				if (ignoredflag == 0 && outputflag == 1) {
 					printf("\n%s:\n", entry->fts_path);
 				}
 				
 			}
-			if (ignoredflag == 0 && (l_longformat == 1|| n_numericalids == 1 || s_systemblocks == 1)) {
+		
+			outputflag = 1;
+			if (ignoredflag == 0 && (l_longformat == 1|| n_numericalids == 1 || s_systemblocks == 1 || isatty(1) == 0)) {
 				if ((blockchildren = fts_children(directory, 0)) != NULL) {
 					blocksum = countblocks(blockchildren);
 					printblocks_s(blocksum, blocksum,  0);
 				}
 			}
-			if ((recursivechildren = fts_children(directory, 0)) != NULL) {	
+			if (ignoredflag == 0 && (recursivechildren = fts_children(directory, 0)) != NULL) {	
 				getimmediatechildren(recursivechildren, currentlevel);
 			}
 		}	
@@ -494,7 +512,6 @@ main(int argc, char **argv)
 				(void)printf("\n");
 			}
 			(void)printf("%s:\n", DIRS[i]);
-		
 		}
 			formatdir(DIRS[i]); 
 	}

@@ -102,7 +102,7 @@ fts_sizesort(const FTSENT** file1, const FTSENT** file2)
 	if (file1size > file2size) {
 		return -1;
 	}
-	return (strcmp((*file1)->fts_name, (*file2)->fts_name));
+	return fts_lexicosort(file1, file2);
 }
 
 int 
@@ -116,7 +116,7 @@ fts_rsizesort(const FTSENT** file1, const FTSENT** file2)
 	if (file1size > file2size) {
 		return 1;
 	}
-	return -1 * (strcmp((*file1)->fts_name, (*file2)->fts_name));
+	return fts_rlexicosort(file1, file2);
 }
 
 int
@@ -130,7 +130,7 @@ fts_timemodifiedsort(const FTSENT** file1, const FTSENT** file2)
 	if (file1time > file2time) {
 		return -1;
 	}
-	return -(strcmp((*file1)->fts_name, (*file2)->fts_name));
+	return fts_lexicosort(file1, file2);
 }
 
 int
@@ -144,7 +144,7 @@ fts_rtimemodifiedsort(const FTSENT** file1, const FTSENT** file2)
 	if (file1time > file2time) {
 		return 1;
 	}
-	return (strcmp((*file1)->fts_name, (*file2)->fts_name));
+	return fts_lexicosort(file1, file2);
 }
 
 int
@@ -158,7 +158,7 @@ fts_lastaccesssort(const FTSENT** file1, const FTSENT** file2)
 	if (file1time > file2time) {
 		return -1;
 	}
-	return (strcmp((*file1)->fts_name, (*file2)->fts_name));
+	return fts_lexicosort(file1, file2);
 }
 
 int
@@ -172,7 +172,7 @@ fts_rlastaccesssort(const FTSENT** file1, const FTSENT** file2)
 	if (file1time > file2time) {
 		return 1;
 	}
-	return (strcmp((*file1)->fts_name, (*file2)->fts_name));
+	return -fts_lexicosort(file1, file2);
 }
 
 int
@@ -186,7 +186,7 @@ fts_statuschangesort(const FTSENT** file1, const FTSENT** file2)
 	if (file1time > file2time) {
 		return -1;
 	}
-	return -(strcmp((*file1)->fts_name, (*file2)->fts_name));
+	return fts_lexicosort(file1, file2);
 }
 
 int
@@ -200,5 +200,5 @@ fts_rstatuschangesort(const FTSENT** file1, const FTSENT** file2)
 	if (file1time > file2time) {
 		return 1;
 	}
-	return (strcmp((*file1)->fts_name, (*file2)->fts_name));
+	return fts_lexicosort(file1, file2);
 }

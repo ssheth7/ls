@@ -9,6 +9,7 @@
 #include <grp.h>
 #include <math.h>
 #include <pwd.h>
+#include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -99,25 +100,11 @@ printraw_q(char* entry)
 		}
 		index++;
 	}
-	(void)printf("\n");
-}
-
-void
-printraw_w(char* entry)
-{
-	int index;
-
-	index = 0;
-	while(entry[index]) {
-		if (isprint(entry[index])) {
-			(void)printf("%c", entry[index]);
-		} else {
-			(void)printf("%c", entry[index]);
-		}
-		index++;
+	if (l_longformat == 0 && n_numericalids == 0) {
+		(void)printf("\n");
 	}
-	(void)printf("\n");
 }
+
 
 void
 printinode_i(struct stat sb) 
@@ -163,7 +150,7 @@ printlong_l(char* entry, char* path, struct stat sb)
 	char sizebuf[6];
 	char permbuf[12];
 	char timebuf[13];
-	char linkbuf[PATH_MAX];
+	char linkbuf[PATH_MAX], fullpath[PATH_MAX], currentdir[PATH_MAX];
 	char* timeformat;
 	time_t currentepochtime, fileepochtime;
 	uid_t uid;
@@ -171,6 +158,8 @@ printlong_l(char* entry, char* path, struct stat sb)
 	struct tm *currenttime, *filetime;
 	struct group *group;
 	struct passwd *passwd;
+
+	getcwd(currentdir, sizeof(currentdir));
 	
 	entrymode = sb.st_mode;
 	(void)strmode(entrymode, permbuf);
@@ -245,23 +234,29 @@ printlong_l(char* entry, char* path, struct stat sb)
 		printf("%d ", sb.st_size);
 	}
 	
-	printf("%s %s", timebuf, entry);
-	char *fullpath;
-	if ((fullpath = malloc(strlen(path) + strlen(entry) + 2)) == NULL) {
-		(void)fprintf(stderr, "Cannot allocate memory: %s\n", strerror(errno));
-		exit(EXIT_FAILURE);
+	printf("%s ", timebuf);
+	
+	if (q_forcenonprintable == 1) {
+		printraw_q(entry);
+	} else {
+		printf("%s ", entry);
 	}
-	strcpy(fullpath, path);
-	strcat(fullpath, "/");
-	strcat(fullpath, entry);
+
+	len = strlen(path) + 1 + strlen(basename(entry));
+	if (len != snprintf(fullpath, PATH_MAX, "%s/%s", path, basename(entry))) {
+		fprintf(stderr, "Could not format path off entry: %s\n", entry);
+		EXIT_STATUS = EXIT_FAILURE;
+	}
+	fullpath[len] = '\0';
 	
 	if (S_ISLNK(entrymode)) {
-		if ((len = readlink(fullpath, linkbuf, sizeof(linkbuf) - 1)) == -1) {
-			//fprintf(stderr, "Could not read link: %s\n", strerror(errno));
-			//EXIT_STATUS = EXIT_FAILURE;
-		}
-		linkbuf[len] = '\0';
-		printf("-> %s", linkbuf);
+		if ((len = readlink(fullpath, linkbuf, sizeof(linkbuf) - 1)) != -1) {
+			linkbuf[len] = '\0';
+			printf("-> %s", linkbuf);
+		} else if  ((len = readlink(entry, linkbuf, sizeof(linkbuf) - 1)) != -1){
+			linkbuf[len] = '\0';
+			printf("-> %s", linkbuf);
+		} 
 	}	
 	printf("\n");
 }
