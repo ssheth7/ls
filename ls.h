@@ -5,7 +5,7 @@
 
 int parseargs(int, char*[]);
 void splitargs(int, char*[], int);
-void formatentry(char*, char*, struct stat);
+void formatentry(char*, char*, struct stat, int, int, int, int);
 void formatdir(char*);
 void cleanup();
 int main(int, char*[]);

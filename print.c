@@ -142,7 +142,8 @@ printblocks_s(int blocks, int size, int isEntry)
 
 // Make print pretty
 void
-printlong_l(char* entry, char* path, struct stat sb) 
+printlong_l(char* entry, char* path, struct stat sb, 
+int blockpadding, int userpadding, int grouppadding, int sizepadding) 
 {
 	int invalidgid, invaliduid, humanizeflags;
 	int entrymode, numlinks, len;

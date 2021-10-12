@@ -7,8 +7,11 @@
 #include <limits.h>
 #include <string.h>
 
-void getimmediatechildren(FTSENT*, int);
-int countblocks(FTSENT*);
+void getimmediatechildren(FTSENT*, int, int, int, int, int);
+int countblocks(FTSENT*, int*, int*, int*, int*);
+void getpaddingsizes(struct stat, int*, int*, int*, int*);
+int countdigits(int);
+
 int lexicosort(const void*, const void*);
 
 int fts_lexicosort(const FTSENT** file1, const FTSENT** file2);

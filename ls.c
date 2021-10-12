@@ -252,7 +252,6 @@ splitargs(int argc, char **argv, int offset)
 				nondirindex++;
 			}
 		} else {
-			(void)fprintf(stderr, "%s: cannot access %s: No such file or director\n", getprogname(), argv[i]);
 			EXIT_STATUS = EXIT_FAILURE;
 		}
 	}
@@ -262,7 +261,8 @@ splitargs(int argc, char **argv, int offset)
  * Reads flags and called corresponding print functions 
 */
 void
-formatentry(char* entry, char* path, struct stat sb)
+formatentry(char* entry, char* path, struct stat sb,
+int blockpadding, int userpadding, int grouppadding, int sizepadding) 
 {
 	int printallflags = A_allentries || a_allentries;
 	
@@ -280,7 +280,7 @@ formatentry(char* entry, char* path, struct stat sb)
 		printblocks_s(sb.st_blocks, sb.st_size,  1);
 	}
 	if (n_numericalids == 1 || l_longformat == 1) {
-		printlong_l(entry, path,  sb);
+		printlong_l(entry, path, sb, blockpadding, userpadding, grouppadding, sizepadding);
 	}  else if (q_forcenonprintable == 1) {
 		printraw_q(entry);
 	} else {
@@ -297,11 +297,19 @@ formatdir(char* dir)
 {
 	int blocksum, currentlevel, fileinfo;
 	int ftsopenflags, printallflags, ignoredflag, outputflag;
+	int blockpadding, userpadding, grouppadding, sizepadding;
 	char *dirptr[2];
 	FTSENT *blockchildren, *entry, *recursivechildren;
 	FTS *directory;
 	
-	
+	if (s_systemblocks == 1) {
+		blockpadding = 0;
+	}	
+	if (l_longformat || n_numericalids) {
+		userpadding = 0;
+		grouppadding = 0;
+		sizepadding = 0;
+	}
 	int (*comparefunction)(const FTSENT **, const FTSENT **);
 	
 	comparefunction = &fts_lexicosort;
@@ -375,12 +383,14 @@ formatdir(char* dir)
 			blocksum = 0;
 			if (l_longformat ==1 || n_numericalids == 1|| s_systemblocks == 1 || isatty(1) == 0) {
 				if (entry->fts_level == 0 && (blockchildren = fts_children(directory, 0)) != NULL) {
-					blocksum = countblocks(blockchildren);
-					printblocks_s(blocksum, blocksum,  0);
+					blocksum = countblocks(blockchildren, 
+					&blockpadding, &userpadding, &grouppadding, &sizepadding);
+					printblocks_s(blocksum, blocksum, 0);
 				}
 			}
 			if (entry->fts_level > 0) {
-				formatentry(entry->fts_name, entry->fts_path, *entry->fts_statp);
+				formatentry(entry->fts_name, entry->fts_path, *entry->fts_statp, 
+				blockpadding, userpadding, grouppadding, sizepadding);
 			}
 		}	
 	} else {
@@ -408,12 +418,14 @@ formatdir(char* dir)
 			outputflag = 1;
 			if (ignoredflag == 0 && (l_longformat == 1|| n_numericalids == 1 || s_systemblocks == 1 || isatty(1) == 0)) {
 				if ((blockchildren = fts_children(directory, 0)) != NULL) {
-					blocksum = countblocks(blockchildren);
+					blocksum = countblocks(blockchildren, 
+					&blockpadding, &userpadding, &grouppadding, &sizepadding);
 					printblocks_s(blocksum, blocksum,  0);
 				}
 			}
 			if (ignoredflag == 0 && (recursivechildren = fts_children(directory, 0)) != NULL) {	
-				getimmediatechildren(recursivechildren, currentlevel);
+				getimmediatechildren(recursivechildren, currentlevel, 
+				blockpadding, userpadding, grouppadding, sizepadding);
 			}
 		}	
 	}
@@ -446,7 +458,7 @@ cleanup() {
 int
 main(int argc, char **argv) 
 {
-	int i, argoffset;
+	int i, argoffset, outputflag;
 	struct stat sb;
 	
 	setprogname(argv[0]);
@@ -492,13 +504,15 @@ main(int argc, char **argv)
 	qsort(NONDIRS, NUMNONDIRS, sizeof(char*), lexicosort);	
 	qsort(DIRS, NUMDIRS, sizeof(char*), lexicosort);
 
+	outputflag = 0;
 	/* Prints non directory entries and then directory entries */	
 	for (i = 0; i < NUMNONDIRS; i++) {
 		if (stat(NONDIRS[i], &sb) != 0) {
 			(void)fprintf(stderr, "%s: cannot access %s: No such file or directory.\n", getprogname(), NONDIRS[i]);
 			continue;
 		}
-		formatentry(NONDIRS[i], dirname(NONDIRS[i]), sb);
+		formatentry(NONDIRS[i], dirname(NONDIRS[i]), sb, 0, 0, 0, 0);
+		outputflag = 1;
 	}
 
 	for (i = 0; i < NUMDIRS; i++) {
@@ -508,7 +522,7 @@ main(int argc, char **argv)
 			continue;
 		}
 		if (NUMDIRS + NUMNONDIRS > 1) {
-			if (i > 0) {
+			if (outputflag == 1) {
 				(void)printf("\n");
 			}
 			(void)printf("%s:\n", DIRS[i]);

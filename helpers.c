@@ -37,40 +37,86 @@ extern int u_lastaccess;        /* Shows time of last access  */
 extern int w_forcenonprintable; /* Forces raw nonprintable characters  */ 
 
 
-// -lR does not print link destinations
 void
-getimmediatechildren(FTSENT* children, int parentlevel)
+getimmediatechildren(FTSENT* children, int parentlevel, 
+int blockpadding, int userpadding, int grouppadding, int sizepadding)
 {
 	while(children != NULL) {
 		if (children->fts_level == parentlevel + 1) {
-			formatentry(children->fts_name, children->fts_path,  *children->fts_statp);
+			formatentry(children->fts_name, children->fts_path,  *children->fts_statp, 
+			blockpadding, userpadding, grouppadding, sizepadding);
 		}
 		children = children->fts_link;
 	}
 }
 
 int 
-countblocks(FTSENT *children)
+countblocks(FTSENT *children, int *blockpadding, int *userpadding, int *grouppadding, int *sizepadding)
 {
-	int blocksum, printallflags;
+	int blocks, blocksum, printallflags, size, total;
 	
 	printallflags = A_allentries || a_allentries; 
 	blocksum = 0;
+	size = 0;
+	total = 0;
+
 	while (children != NULL) {
 		while(children != NULL) {
 			if (printallflags || strncmp(children->fts_name, ".", 1) != 0) {
-				if (!h_humanreadable) {
-					blocksum += children->fts_statp->st_blocks;
-				} else {
-					blocksum += children->fts_statp->st_size;	
-				}
+				
+				blocks = children->fts_statp->st_blocks;
+				size = children->fts_statp->st_size;	
+				total += size;
+				blocksum += blocks;
+	
+				getpaddingsizes(*children->fts_statp, blockpadding, userpadding, 
+				grouppadding, sizepadding);
+				
 			}
 			children = children->fts_link;
 		}
 	}
+	if (h_humanreadable == 1) {
+		return total;
+	}
 	return blocksum;
 }
 
+void
+getpaddingsizes(struct stat sb, int *blockpadding, 
+int *userpadding, int *grouppadding, int *sizepadding) {
+	int blocks, digitlen, gid, size, uid;
+	struct group *group;
+	struct passwd *passwd;
+
+	blocks = sb.st_blocks;
+	size = sb.st_size;
+	uid = sb.st_uid;
+	gid = sb.st_gid;
+	digitlen = 0;
+	
+	digitlen = countdigits(blocks);
+	if (digitlen > *blockpadding) {
+		*blockpadding = digitlen;
+	}
+	digitlen = countdigits(size);
+	if (digitlen > *sizepadding) {
+		*sizepadding = digitlen;
+	}
+	
+}
+int
+countdigits(int digit)
+{
+	int numdigits;
+
+	numdigits = 0;
+	while (digit > 0){
+		numdigits++;
+		digit/=10;
+	}
+	return numdigits;
+}
 int
 lexicosort(const void* str1, const void* str2) 
 {
@@ -172,7 +218,7 @@ fts_rlastaccesssort(const FTSENT** file1, const FTSENT** file2)
 	if (file1time > file2time) {
 		return 1;
 	}
-	return -fts_lexicosort(file1, file2);
+	return fts_lexicosort(file1, file2);
 }
 
 int
