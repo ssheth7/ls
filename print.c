@@ -16,6 +16,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "helpers.h"
 #include "print.h"
 
 
@@ -107,24 +108,25 @@ printraw_q(char* entry)
 
 
 void
-printinode_i(struct stat sb) 
+printinode_i(struct stat sb, int padding) 
 {
-	(void)printf("%ld ", sb.st_ino);
+	(void)printf("%*ld ", padding, sb.st_ino);
 }
 
 void
-printblocks_s(int blocks, int size, int isEntry)
+printblocks_s(int blocks, int size, int isEntry, int blockpadding)
 {
 	int humanizeflags;
 	char buf[6];
 	if (!h_humanreadable) {
 		if (isEntry == 1) {
-			(void)printf("%d ", CEIL(blocks, BLOCKSIZE, 512));
+			(void)printf("%*d ", blockpadding, CEIL(blocks, BLOCKSIZE, 512));
 		} else {
 			(void)printf("total %d\n", CEIL(blocks, BLOCKSIZE, 512));
 		}
 		return;	
 	}
+	
 	if ((n_numericalids || l_longformat) && isEntry) {
 		size = blocks * BLOCKSIZE;
 	}
@@ -134,7 +136,7 @@ printblocks_s(int blocks, int size, int isEntry)
 		EXIT_STATUS = EXIT_FAILURE;
 	}
 	if (isEntry == 1) {
-		(void)printf("%s ", buf);
+		(void)printf("%5s",  buf);
 	} else {
 		(void)printf("total %s\n", buf);
 	}
@@ -142,8 +144,7 @@ printblocks_s(int blocks, int size, int isEntry)
 
 // Make print pretty
 void
-printlong_l(char* entry, char* path, struct stat sb, 
-int blockpadding, int userpadding, int grouppadding, int sizepadding) 
+printlong_l(char* entry, char* path, struct stat sb, struct paddings paddings) 
 {
 	int invalidgid, invaliduid, humanizeflags;
 	int entrymode, numlinks, len;
@@ -210,17 +211,21 @@ int blockpadding, int userpadding, int grouppadding, int sizepadding)
 	}
 	
 	if (invalidgid == 1 && invaliduid == 0) {
-		printf("%s %d %s %d ", 
-		permbuf, numlinks, passwd->pw_name, gid);
+		printf("%s %*d %*s  %*d", 
+		permbuf, paddings.linkpadding, numlinks, paddings.userpadding, 
+		passwd->pw_name, paddings.grouppadding, gid);
 	} else if (invalidgid == 0 && invaliduid == 1) {
-		printf("%s %d %d %s ", 
-		permbuf, numlinks, uid, group->gr_name);
+		printf("%s %*d %*d  %*s", 
+		permbuf, paddings.linkpadding, numlinks, paddings.userpadding, uid, 
+		paddings.grouppadding, group->gr_name);
 	} else if (invalidgid == 1 && invaliduid == 1) {
-		printf("%s %d %d %d ", 
-		permbuf, numlinks, uid, gid);
+		printf("%s %*d %*d  %*d", 
+		permbuf, paddings.linkpadding, numlinks, paddings.userpadding, uid, 
+		paddings.grouppadding, gid);
 	} else {
-		printf("%s %d %s %s ", 
-		permbuf, numlinks, passwd->pw_name, group->gr_name);
+		printf("%s %*d %*s  %*s", 
+		permbuf, paddings.linkpadding, numlinks, paddings.userpadding, passwd->pw_name,
+		 paddings.grouppadding, group->gr_name);
 	}
 	
 	if (h_humanreadable == 1) {
@@ -230,12 +235,12 @@ int blockpadding, int userpadding, int grouppadding, int sizepadding)
 			(void)fprintf(stderr, "Humanize function failed: %s\n", strerror(errno)); 
 			EXIT_STATUS = EXIT_FAILURE;
 		}
-		printf("%s ", sizebuf);	
+		printf(" %6s", sizebuf);	
 	} else {
-		printf("%d ", sb.st_size);
+		printf(" %*d ", paddings.sizepadding + 1, sb.st_size);
 	}
 	
-	printf("%s ", timebuf);
+	printf("%10s ", timebuf);
 	
 	if (q_forcenonprintable == 1) {
 		printraw_q(entry);

@@ -6,6 +6,8 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fts.h>
+#include <grp.h>
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,20 +40,19 @@ extern int w_forcenonprintable; /* Forces raw nonprintable characters  */
 
 
 void
-getimmediatechildren(FTSENT* children, int parentlevel, 
-int blockpadding, int userpadding, int grouppadding, int sizepadding)
+getimmediatechildren(FTSENT* children, int parentlevel, struct paddings *paddings) 
 {
 	while(children != NULL) {
 		if (children->fts_level == parentlevel + 1) {
-			formatentry(children->fts_name, children->fts_path,  *children->fts_statp, 
-			blockpadding, userpadding, grouppadding, sizepadding);
+			formatentry(children->fts_name, children->fts_path,
+			  *children->fts_statp, *paddings);
 		}
 		children = children->fts_link;
 	}
 }
 
 int 
-countblocks(FTSENT *children, int *blockpadding, int *userpadding, int *grouppadding, int *sizepadding)
+countblocks(FTSENT *children, struct paddings *paddings)
 {
 	int blocks, blocksum, printallflags, size, total;
 	
@@ -69,9 +70,7 @@ countblocks(FTSENT *children, int *blockpadding, int *userpadding, int *grouppad
 				total += size;
 				blocksum += blocks;
 	
-				getpaddingsizes(*children->fts_statp, blockpadding, userpadding, 
-				grouppadding, sizepadding);
-				
+				getpaddingsizes(*children->fts_statp, paddings); 
 			}
 			children = children->fts_link;
 		}
@@ -83,9 +82,12 @@ countblocks(FTSENT *children, int *blockpadding, int *userpadding, int *grouppad
 }
 
 void
-getpaddingsizes(struct stat sb, int *blockpadding, 
-int *userpadding, int *grouppadding, int *sizepadding) {
-	int blocks, digitlen, gid, size, uid;
+getpaddingsizes(struct stat sb, struct paddings *paddings) 
+{
+	int digitlen, gid, links, uid;
+	blkcnt_t blocks;
+	ino_t inode;
+	off_t size;
 	struct group *group;
 	struct passwd *passwd;
 
@@ -93,20 +95,49 @@ int *userpadding, int *grouppadding, int *sizepadding) {
 	size = sb.st_size;
 	uid = sb.st_uid;
 	gid = sb.st_gid;
+	inode = sb.st_ino;
+	links = sb.st_nlink;
 	digitlen = 0;
 	
 	digitlen = countdigits(blocks);
-	if (digitlen > *blockpadding) {
-		*blockpadding = digitlen;
+	if (digitlen > paddings->blockpadding) {
+		paddings->blockpadding = digitlen;
 	}
 	digitlen = countdigits(size);
-	if (digitlen > *sizepadding) {
-		*sizepadding = digitlen;
+	if (digitlen > paddings->sizepadding) {
+		paddings->sizepadding = digitlen;
+	}
+	digitlen = countdigits(links);
+	if (digitlen > paddings->linkpadding) {
+		paddings->linkpadding = digitlen;
+	}
+	if (n_numericalids == 1 || (passwd = getpwuid(uid)) == NULL) {
+		digitlen = countdigits(uid);
+	} else {
+		digitlen = strlen(passwd->pw_name);
+	}
+	if (digitlen > paddings->userpadding) {
+		paddings->userpadding = digitlen;
+	}
+
+	if (n_numericalids == 1 || (group = getgrgid(gid)) == NULL) {
+		digitlen = countdigits(gid);	
+	} else {
+		digitlen = strlen(group->gr_name);
+
+	}
+
+	if (digitlen > paddings->grouppadding) {
+		paddings->grouppadding = digitlen;
 	}
 	
+	digitlen = countdigits(inode);
+	if (digitlen > paddings->inodepadding) {
+		paddings->inodepadding = digitlen;
+	}
 }
 int
-countdigits(int digit)
+countdigits(long digit)
 {
 	int numdigits;
 
@@ -218,7 +249,7 @@ fts_rlastaccesssort(const FTSENT** file1, const FTSENT** file2)
 	if (file1time > file2time) {
 		return 1;
 	}
-	return fts_lexicosort(file1, file2);
+	return 0;
 }
 
 int

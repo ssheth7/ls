@@ -7,10 +7,20 @@
 #include <limits.h>
 #include <string.h>
 
-void getimmediatechildren(FTSENT*, int, int, int, int, int);
-int countblocks(FTSENT*, int*, int*, int*, int*);
-void getpaddingsizes(struct stat, int*, int*, int*, int*);
-int countdigits(int);
+
+typedef struct paddings {
+	int blockpadding;
+	int grouppadding;
+	int inodepadding;
+	int linkpadding;
+	int sizepadding;
+	int userpadding;
+} paddings;
+
+void getimmediatechildren(FTSENT*, int, struct paddings*);
+int countblocks(FTSENT*, struct paddings*);
+void getpaddingsizes(struct stat, struct paddings*);
+int countdigits(long);
 
 int lexicosort(const void*, const void*);
 
