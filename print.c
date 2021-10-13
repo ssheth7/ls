@@ -197,7 +197,7 @@ printlong_l(char* entry, char* path, struct stat sb, struct paddings paddings)
 	
 	timeformat = "%b %d %k:%M";
 	if (fileyear != currentyear) {
-		timeformat = "%b %d %Y";
+		timeformat = "%b %d  %Y";
 	} 
 	if (strftime(timebuf, sizeof(timebuf), timeformat, filetime) == 0) {
 		fprintf(stderr, "Could not format date of %s.\n", entry); 
@@ -211,21 +211,21 @@ printlong_l(char* entry, char* path, struct stat sb, struct paddings paddings)
 	}
 	
 	if (invalidgid == 1 && invaliduid == 0) {
-		printf("%s %*d %*s  %*d", 
-		permbuf, paddings.linkpadding, numlinks, paddings.userpadding, 
-		passwd->pw_name, paddings.grouppadding, gid);
+		printf("%s %*d %-*s %-*d", 
+		permbuf, paddings.link, numlinks, paddings.user, 
+		passwd->pw_name, paddings.group, gid);
 	} else if (invalidgid == 0 && invaliduid == 1) {
-		printf("%s %*d %*d  %*s", 
-		permbuf, paddings.linkpadding, numlinks, paddings.userpadding, uid, 
-		paddings.grouppadding, group->gr_name);
+		printf("%s %*d %-*d %-*s", 
+		permbuf, paddings.link, numlinks, paddings.user, uid, 
+		paddings.group, group->gr_name);
 	} else if (invalidgid == 1 && invaliduid == 1) {
-		printf("%s %*d %*d  %*d", 
-		permbuf, paddings.linkpadding, numlinks, paddings.userpadding, uid, 
-		paddings.grouppadding, gid);
+		printf("%s %*d %-*d %-*d", 
+		permbuf, paddings.link, numlinks, paddings.user, uid, 
+		paddings.group, gid);
 	} else {
-		printf("%s %*d %*s  %*s", 
-		permbuf, paddings.linkpadding, numlinks, paddings.userpadding, passwd->pw_name,
-		 paddings.grouppadding, group->gr_name);
+		printf("%s %*d %-*s %-*s", 
+		permbuf, paddings.link, numlinks, paddings.user, passwd->pw_name,
+		 paddings.group, group->gr_name);
 	}
 	
 	if (h_humanreadable == 1) {
@@ -237,10 +237,10 @@ printlong_l(char* entry, char* path, struct stat sb, struct paddings paddings)
 		}
 		printf(" %6s", sizebuf);	
 	} else {
-		printf(" %*d ", paddings.sizepadding + 1, sb.st_size);
+		printf(" %*d ", paddings.size + 1, sb.st_size);
 	}
 	
-	printf("%10s ", timebuf);
+	printf("%11s ", timebuf);
 	
 	if (q_forcenonprintable == 1) {
 		printraw_q(entry);

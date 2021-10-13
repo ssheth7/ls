@@ -9,12 +9,12 @@
 
 
 typedef struct paddings {
-	int blockpadding;
-	int grouppadding;
-	int inodepadding;
-	int linkpadding;
-	int sizepadding;
-	int userpadding;
+	int block;
+	int group;
+	int inode;
+	int link;
+	int size;
+	int user;
 } paddings;
 
 void getimmediatechildren(FTSENT*, int, struct paddings*);

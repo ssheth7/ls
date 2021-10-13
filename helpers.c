@@ -44,7 +44,7 @@ getimmediatechildren(FTSENT* children, int parentlevel, struct paddings *padding
 {
 	while(children != NULL) {
 		if (children->fts_level == parentlevel + 1) {
-			formatentry(children->fts_name, children->fts_path,
+			formatentry(0, children->fts_name, children->fts_path,
 			  *children->fts_statp, *paddings);
 		}
 		children = children->fts_link;
@@ -100,24 +100,24 @@ getpaddingsizes(struct stat sb, struct paddings *paddings)
 	digitlen = 0;
 	
 	digitlen = countdigits(blocks);
-	if (digitlen > paddings->blockpadding) {
-		paddings->blockpadding = digitlen;
+	if (digitlen > paddings->block) {
+		paddings->block = digitlen;
 	}
 	digitlen = countdigits(size);
-	if (digitlen > paddings->sizepadding) {
-		paddings->sizepadding = digitlen;
+	if (digitlen > paddings->size) {
+		paddings->size = digitlen;
 	}
 	digitlen = countdigits(links);
-	if (digitlen > paddings->linkpadding) {
-		paddings->linkpadding = digitlen;
+	if (digitlen > paddings->link) {
+		paddings->link = digitlen;
 	}
 	if (n_numericalids == 1 || (passwd = getpwuid(uid)) == NULL) {
 		digitlen = countdigits(uid);
 	} else {
 		digitlen = strlen(passwd->pw_name);
 	}
-	if (digitlen > paddings->userpadding) {
-		paddings->userpadding = digitlen;
+	if (digitlen > paddings->user) {
+		paddings->user = digitlen;
 	}
 
 	if (n_numericalids == 1 || (group = getgrgid(gid)) == NULL) {
@@ -127,13 +127,13 @@ getpaddingsizes(struct stat sb, struct paddings *paddings)
 
 	}
 
-	if (digitlen > paddings->grouppadding) {
-		paddings->grouppadding = digitlen;
+	if (digitlen > paddings->group) {
+		paddings->group = digitlen;
 	}
 	
 	digitlen = countdigits(inode);
-	if (digitlen > paddings->inodepadding) {
-		paddings->inodepadding = digitlen;
+	if (digitlen > paddings->inode) {
+		paddings->inode = digitlen;
 	}
 }
 int

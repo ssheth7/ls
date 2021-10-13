@@ -30,6 +30,8 @@
  use getbsize
  change padding struct parameters
  run exit status tests
+ store time in unsigned form
+ left align users/group
 */
 
 /* flags  */
@@ -265,11 +267,11 @@ splitargs(int argc, char **argv, int offset)
  * Reads flags and called corresponding print functions 
 */
 void
-formatentry(char* entry, char* path, struct stat sb, struct paddings paddings)
+formatentry(int directentry, char* entry, char* path, struct stat sb, struct paddings paddings)
 {
 	int printallflags = A_allentries || a_allentries;
 	
-	if (d_directories ==0 && printallflags == 0 && entry[0] == '.') {
+	if (directentry == 0 && d_directories == 0 && printallflags == 0 && entry[0] == '.') {
 		return;
 	}
 	
@@ -277,10 +279,10 @@ formatentry(char* entry, char* path, struct stat sb, struct paddings paddings)
 		addsymbols_F(&entry, sb);
 	}
 	if (i_inodes == 1) {
-		printinode_i(sb, paddings.inodepadding);
+		printinode_i(sb, paddings.inode);
 	} 
 	if (s_systemblocks == 1) {
-		printblocks_s(sb.st_blocks, sb.st_size,  1, paddings.blockpadding);
+		printblocks_s(sb.st_blocks, sb.st_size,  1, paddings.block);
 	}
 	if (n_numericalids == 1 || l_longformat == 1) {
 		printlong_l(entry, path, sb, paddings);
@@ -308,12 +310,12 @@ formatdir(char* dir)
 
 	
 	int (*comparefunction)(const FTSENT **, const FTSENT **);
-	paddings.blockpadding = 0;
-	paddings.userpadding = 0;
-	paddings.grouppadding = 0;
-	paddings.sizepadding = 0;
-	paddings.inodepadding = 0;
-	paddings.linkpadding = 0;
+	paddings.block = 0;
+	paddings.user = 0;
+	paddings.group = 0;
+	paddings.size = 0;
+	paddings.inode = 0;
+	paddings.link = 0;
 	comparefunction = &fts_lexicosort;
 	
 	if (r_reverseorder == 1) {
@@ -387,13 +389,14 @@ formatdir(char* dir)
 			if (l_longformat ==1 || n_numericalids == 1|| s_systemblocks == 1 || isatty(1) == 0) {
 				if (entry->fts_level == 0 && (blockchildren = fts_children(directory, 0)) != NULL) {
 					blocksum = countblocks(blockchildren, &paddings);
-					printblocks_s(blocksum, blocksum, 0, paddings.blockpadding);
-					printf("Padding: blocks: %d user: %d group: %d size: %d inode : %d link %d\n", 
-					paddings.blockpadding, paddings.userpadding, paddings.grouppadding, paddings.sizepadding, paddings.inodepadding, paddings.linkpadding);
+					printblocks_s(blocksum, blocksum, 0, paddings.block);
+					printf("Padding: blocks: %d user: %d group: %d size:  %d inode : %d link %d\n", 
+					paddings.block, paddings.user, paddings.group, paddings.size, 
+					paddings.inode, paddings.link);
 				}
 			}
 			if (entry->fts_level > 0) {
-				formatentry(entry->fts_name, entry->fts_path, *entry->fts_statp, paddings); 
+				formatentry(0, entry->fts_name, entry->fts_path, *entry->fts_statp, paddings); 
 			}
 		}	
 	} else {
@@ -415,19 +418,19 @@ formatdir(char* dir)
 				if (ignoredflag == 0 && outputflag == 1) {
 					printf("\n%s:\n", entry->fts_path);
 				}
-				paddings.blockpadding = 0;
-				paddings.userpadding = 0;
-				paddings.grouppadding = 0;
-				paddings.sizepadding = 0;
-				paddings.inodepadding = 0;
-				paddings.linkpadding = 0;
+				paddings.block = 0;
+				paddings.user = 0;
+				paddings.group = 0;
+				paddings.size = 0;
+				paddings.inode = 0;
+				paddings.link = 0;
 			}
 		
 			outputflag = 1;
 			if (ignoredflag == 0 && (l_longformat == 1|| n_numericalids == 1 || s_systemblocks == 1 || isatty(1) == 0)) {
 				if ((blockchildren = fts_children(directory, 0)) != NULL) {
 					blocksum = countblocks(blockchildren, &paddings); 
-					printblocks_s(blocksum, blocksum,  0, paddings.blockpadding);
+					printblocks_s(blocksum, blocksum,  0, paddings.block);
 				//	printf("Padding: blocks: %d user: %d group: %d size: %d inode : %d\n", 
 				//	blockpadding, userpadding, grouppadding, sizepadding, inodepadding);
 				}
@@ -468,7 +471,7 @@ main(int argc, char **argv)
 {
 	int i, argoffset, outputflag;
 	struct stat sb;
-	struct paddings paddings;
+	paddings paddings;
 	
 	setprogname(argv[0]);
 	
@@ -514,13 +517,28 @@ main(int argc, char **argv)
 	qsort(DIRS, NUMDIRS, sizeof(char*), lexicosort);
 
 	outputflag = 0;
-	/* Prints non directory entries and then directory entries */	
+	
+	if (l_longformat  == 1|| n_numericalids == 1) {
+		paddings.block = 0;
+		paddings.user = 0;
+		paddings.group = 0;
+		paddings.size = 0;
+		paddings.inode = 0;
+		paddings.link = 0;
+		for (i = 0; i < NUMNONDIRS; i++) {
+			if (stat(NONDIRS[i], &sb) == 0) {
+				getpaddingsizes(sb, &paddings);	
+			}
+		}					
+	}
+	/* Visits non directory entries and then directory entries */	
 	for (i = 0; i < NUMNONDIRS; i++) {
 		if (stat(NONDIRS[i], &sb) != 0) {
-			(void)fprintf(stderr, "%s: cannot access %s: No such file or directory.\n", getprogname(), NONDIRS[i]);
+			(void)fprintf(stderr, "%s: cannot access %s: No such file or directory.\n"
+			, getprogname(), NONDIRS[i]);
 			continue;
 		}
-		formatentry(NONDIRS[i], dirname(NONDIRS[i]), sb, paddings);
+		formatentry(1, NONDIRS[i], dirname(NONDIRS[i]), sb, paddings);
 		outputflag = 1;
 	}
 
