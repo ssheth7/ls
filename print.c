@@ -41,7 +41,7 @@ extern int t_modifiedsorted;    /* Sort by time modified */
 extern int u_lastaccess;        /* Shows time of last access  */                          
 extern int w_forcenonprintable; /* Forces raw nonprintable characters  */ 
 
-extern int BLOCKSIZE;
+extern long BLOCKSIZE;
 extern int EXIT_STATUS;
 
 #define CEIL(w, x, y) (1 + (w - 1)/(x / y))
@@ -118,11 +118,13 @@ printblocks_s(int blocks, int size, int isEntry, int blockpadding)
 {
 	int humanizeflags;
 	char buf[6];
+	long defaultblocksize = 512;
+	long dblocks = ceil(dblocks / (BLOCKSIZE / defaultblocksize));
 	if (!h_humanreadable) {
 		if (isEntry == 1) {
-			(void)printf("%*d ", blockpadding, CEIL(blocks, BLOCKSIZE, 512));
+			(void)printf("%*ld ", blockpadding, CEIL(blocks, BLOCKSIZE, defaultblocksize));
 		} else {
-			(void)printf("total %d\n", CEIL(blocks, BLOCKSIZE, 512));
+			(void)printf("total %ld\n", CEIL(blocks, BLOCKSIZE, defaultblocksize));
 		}
 		return;	
 	}
@@ -212,19 +214,19 @@ printlong_l(char* entry, char* path, struct stat sb, struct paddings paddings)
 	
 	if (invalidgid == 1 && invaliduid == 0) {
 		printf("%s %*d %-*s %-*d", 
-		permbuf, paddings.link, numlinks, paddings.user, 
+		permbuf, paddings.link, numlinks, paddings.user + 1, 
 		passwd->pw_name, paddings.group, gid);
 	} else if (invalidgid == 0 && invaliduid == 1) {
 		printf("%s %*d %-*d %-*s", 
-		permbuf, paddings.link, numlinks, paddings.user, uid, 
+		permbuf, paddings.link, numlinks, paddings.user + 1, uid, 
 		paddings.group, group->gr_name);
 	} else if (invalidgid == 1 && invaliduid == 1) {
 		printf("%s %*d %-*d %-*d", 
-		permbuf, paddings.link, numlinks, paddings.user, uid, 
+		permbuf, paddings.link, numlinks, paddings.user + 1, uid, 
 		paddings.group, gid);
 	} else {
 		printf("%s %*d %-*s %-*s", 
-		permbuf, paddings.link, numlinks, paddings.user, passwd->pw_name,
+		permbuf, paddings.link, numlinks, paddings.user + 1, passwd->pw_name,
 		 paddings.group, group->gr_name);
 	}
 	

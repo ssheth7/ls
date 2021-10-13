@@ -171,8 +171,8 @@ fts_rlexicosort(const FTSENT** file1, const FTSENT** file2)
 int 
 fts_sizesort(const FTSENT** file1, const FTSENT** file2)
 {
-	int file1size = (*file1)->fts_statp->st_size;
-	int file2size = (*file2)->fts_statp->st_size;
+	off_t file1size = (*file1)->fts_statp->st_size;
+	off_t file2size = (*file2)->fts_statp->st_size;
 	if (file1size < file2size) {
 		return 1;
 	} 
@@ -185,8 +185,8 @@ fts_sizesort(const FTSENT** file1, const FTSENT** file2)
 int 
 fts_rsizesort(const FTSENT** file1, const FTSENT** file2)
 {
-	int file1size = (*file1)->fts_statp->st_size;
-	int file2size = (*file2)->fts_statp->st_size;
+	off_t file1size = (*file1)->fts_statp->st_size;
+	off_t file2size = (*file2)->fts_statp->st_size;
 	if (file1size < file2size) {
 		return -1;
 	} 
@@ -199,8 +199,8 @@ fts_rsizesort(const FTSENT** file1, const FTSENT** file2)
 int
 fts_timemodifiedsort(const FTSENT** file1, const FTSENT** file2)
 {
-	int file1time = (*file1)->fts_statp->st_mtime;
-	int file2time = (*file2)->fts_statp->st_mtime;
+	time_t file1time = (*file1)->fts_statp->st_mtime;
+	time_t file2time = (*file2)->fts_statp->st_mtime;
 	if (file1time < file2time) {
 		return 1;
 	}	
@@ -213,8 +213,8 @@ fts_timemodifiedsort(const FTSENT** file1, const FTSENT** file2)
 int
 fts_rtimemodifiedsort(const FTSENT** file1, const FTSENT** file2)
 {
-	int file1time = (*file1)->fts_statp->st_mtime;
-	int file2time = (*file2)->fts_statp->st_mtime;
+	time_t file1time = (*file1)->fts_statp->st_mtime;
+	time_t file2time = (*file2)->fts_statp->st_mtime;
 	if (file1time < file2time) {
 		return -1;
 	}	
@@ -227,8 +227,8 @@ fts_rtimemodifiedsort(const FTSENT** file1, const FTSENT** file2)
 int
 fts_lastaccesssort(const FTSENT** file1, const FTSENT** file2)
 {
-	int file1time = (*file1)->fts_statp->st_atime;
-	int file2time = (*file2)->fts_statp->st_atime;
+	time_t file1time = (*file1)->fts_statp->st_atime;
+	time_t file2time = (*file2)->fts_statp->st_atime;
 	if (file1time < file2time) {
 		return 1;
 	}	
@@ -241,8 +241,8 @@ fts_lastaccesssort(const FTSENT** file1, const FTSENT** file2)
 int
 fts_rlastaccesssort(const FTSENT** file1, const FTSENT** file2)
 {
-	int file1time = (*file1)->fts_statp->st_atime;
-	int file2time = (*file2)->fts_statp->st_atime;
+	time_t file1time = (*file1)->fts_statp->st_atime;
+	time_t file2time = (*file2)->fts_statp->st_atime;
 	if (file1time < file2time) {
 		return -1;
 	}	
@@ -255,8 +255,8 @@ fts_rlastaccesssort(const FTSENT** file1, const FTSENT** file2)
 int
 fts_statuschangesort(const FTSENT** file1, const FTSENT** file2)
 {
-	int file1time = (*file1)->fts_statp->st_ctime;
-	int file2time = (*file2)->fts_statp->st_ctime;
+	time_t file1time = (*file1)->fts_statp->st_ctime;
+	time_t file2time = (*file2)->fts_statp->st_ctime;
 	if (file1time < file2time) {
 		return 1;
 	}	
@@ -269,8 +269,8 @@ fts_statuschangesort(const FTSENT** file1, const FTSENT** file2)
 int
 fts_rstatuschangesort(const FTSENT** file1, const FTSENT** file2)
 {
-	int file1time = (*file1)->fts_statp->st_ctime;
-	int file2time = (*file2)->fts_statp->st_ctime;
+	time_t file1time = (*file1)->fts_statp->st_ctime;
+	time_t file2time = (*file2)->fts_statp->st_ctime;
 	if (file1time < file2time) {
 		return -1;
 	}	

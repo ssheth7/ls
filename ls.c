@@ -27,11 +27,8 @@
 /*
  TODO:
  combine traversal logic
- use getbsize
- change padding struct parameters
  run exit status tests
- store time in unsigned form
- left align users/group
+ documentation
 */
 
 /* flags  */
@@ -74,8 +71,8 @@ parseargs(int argc, char **argv)
 		
 	if (isatty(1)) {
 		q_forcenonprintable = 1;	
-	} 
-	BLOCKSIZE = 512;
+	}
+	BLOCKSIZE = 512; 
 	flagsset = 0;
 	while ((opt = getopt(argc, argv, "AacdFfhiklnqRrSstuw")) != -1) {
 		flagsset = 1;
@@ -170,24 +167,7 @@ parseargs(int argc, char **argv)
 		A_allentries = 1;
 	}
 	if (s_systemblocks == 1 && h_humanreadable == 0 && k_kilobytes == 0) {
-		if (getenv("BLOCKSIZE") != NULL) {
-			envlength = strlen(getenv("BLOCKSIZE"));
-			if ((blocksize = malloc(envlength * sizeof(char*))) == NULL) {
-				(void)fprintf(stderr, "Could not allocate memory: %s\n", strerror(errno));
-				exit(EXIT_FAILURE);
-			}
-			blocksize = getenv("BLOCKSIZE");
-			BLOCKSIZE = strtol(blocksize, (char **)NULL, 10);
-			if (BLOCKSIZE < 512) {
-				(void)printf("%s: %ld: minimum blocksize is 512\n", getprogname(), BLOCKSIZE);
-				BLOCKSIZE = 512;
-			}
-			if (BLOCKSIZE > 1074741824) {
-				(void)printf("%s: %ld: maximum blocksize is 1G\n", getprogname(), BLOCKSIZE);
-				BLOCKSIZE = 1074741824;
-			}
-		} 
-		
+		getbsize(NULL, &BLOCKSIZE);
 	}
 	return flagsset;
 }
