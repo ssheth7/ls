@@ -21,13 +21,18 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "cmp.h"
 #include "ls.h"
 #include "helpers.h"
 #include "print.h"
+
 /*
  TODO:
- combine traversal logic
  documentation
+ check print/printfs
+ fix comparisons 
+ remove structs
+ remove includes
 */
 
 /* flags  */
@@ -58,199 +63,17 @@ char **DIRS;   		 /* String array of directory arguments */
 char **NONDIRS; 	 /* String array of non-directory arguments */
 
 
-
 /*
- * Parses command line arguments and sets option flags
-*/
-int
-parseargs(int argc, char **argv)
-{	
-	int opt, flagsset, envlength;
-	char* blocksize;
-		
-	if (isatty(1)) {
-		q_forcenonprintable = 1;	
-	}
-	BLOCKSIZE = 512; 
-	flagsset = 0;
-	while ((opt = getopt(argc, argv, "AacdFfhiklnqRrSstuw")) != -1) {
-		flagsset = 1;
-		switch (opt) {
-			case 'A':
-				A_allentries = 1;
-				break;
-			case 'a':
-				a_allentries = 1;
-				A_allentries = 0;
-				break;
-			case 'c':
-				if (f_unsorted == 1) {
-					break;
-				}
-				c_lastchanged = 1;
-				u_lastaccess = 0;
-				break;
-			case 'd':
-				d_directories = 1;
-				break;
-			case 'F':
-				F_specialsymbols = 1;
-				break;
-			case 'f':
-				f_unsorted = a_allentries = 1;
-				r_reverseorder = S_sizesorted = u_lastaccess = c_lastchanged = 0;
-				break;
-			case 'h':
-				h_humanreadable = 1;
-				k_kilobytes = 0;
-				break;
-			case 'i':
-				i_inodes = 1;
-				break;
-			case 'k':
-				k_kilobytes = 1;
-				h_humanreadable = 0;
-				BLOCKSIZE = 1024;
-				break;
-			case 'l':
-				l_longformat = 1;
-				n_numericalids = 0;
-				break;
-			case 'n':
-				n_numericalids = 1;
-				l_longformat = 0;
-				break;
-			case 'q':
-				q_forcenonprintable = 1;
-				break;
-			case 'R':
-				R_recurse = 1;
-				break;
-			case 'r':
-				if (f_unsorted == 1) {
-					break;
-				}
-				r_reverseorder = 1;
-				break;
-			case 'S':
-				if (f_unsorted == 1) {
-					break;
-				}
-				S_sizesorted = 1;
-				break;
-			case 's':
-				s_systemblocks = 1;
-				break;
-			case 't':
-				if (f_unsorted == 1) {
-					break;
-				}
-				t_modifiedsorted = 1;
-				break;
-			case 'u':
-				if (f_unsorted == 1) {
-					break;
-				}
-				u_lastaccess = 1;
-				c_lastchanged = 0;
-				break;
-			case 'w':
-				q_forcenonprintable = 0;
-				break;
-			default: /* Invalid Argument provided  */
-				(void)fprintf(stderr, "%s [-AacdFfhiklnqRrSstuw] [file ...]\n", getprogname());
-				exit(EXIT_FAILURE);
-		}
-	}
-	if (getuid() == 0 && a_allentries == 0) {
-		A_allentries = 1;
-	}
-	if (s_systemblocks == 1 && h_humanreadable == 0 && k_kilobytes == 0) {
-		getbsize(NULL, &BLOCKSIZE);
-	}
-	return flagsset;
-}
-
-/*
- * Splits arguments into DIR and NONDIR arrays
+ * Reads flags and calls corresponding print functions 
 */
 void
-splitargs(int argc, char **argv, int offset)
-{
-	int i, dirindex, nondirindex, arglength;
-	struct stat sb;
-	dirindex = 0;
-	nondirindex = 0;
-	
-	if (NUMDIRS == 0 && NUMNONDIRS == 0) { /* If no command line arguments are provided */
-		if (d_directories == 0){
-			NUMDIRS++;
-			if ((DIRS = malloc(NUMDIRS * sizeof(char*))) == NULL) {
-				(void)fprintf(stderr, "Memory could not be allocated");
-				exit(EXIT_FAILURE);
-			}
-			if ((DIRS[0] = malloc(strlen(".") + 1)) == NULL) {
-				(void)fprintf(stderr, "Could not allocate memory.\n");
-				exit(EXIT_FAILURE);
-			}
-			if (strncpy(DIRS[0], ".", strlen(".")) == NULL) {
-				(void)fprintf(stderr, "Could not copy to destination\n");
-				exit(EXIT_FAILURE);
-			}
-		} else {
-			NUMNONDIRS++;
-			if ((NONDIRS = malloc(NUMNONDIRS * sizeof(char*))) == NULL) {
-				(void)fprintf(stderr, "Memory could not be allocated");
-				exit(EXIT_FAILURE);
-			}
-			if ((NONDIRS[0] = malloc(strlen(".") + 1)) == NULL) {
-				(void)fprintf(stderr, "Could not allocate memory.\n");
-				exit(EXIT_FAILURE);
-			}
-			if (strncpy(NONDIRS[0], ".", strlen(".")) == NULL) {
-				(void)fprintf(stderr, "Could not copy to destination\n");
-				exit(EXIT_FAILURE);
-			}
-		}
-	}
-	
-	for (i = 1 + offset; i < argc; i++){
-
-		if (stat(argv[i], &sb) == 0) {
-			arglength = strlen(argv[i]);
-			if (S_ISDIR(sb.st_mode) && d_directories == 0) {
-				if ((DIRS[dirindex] = malloc(arglength + 1)) == NULL) {
-					(void)fprintf(stderr, "Could not allocate memory.\n");
-				}
-				if (strncpy(DIRS[dirindex], argv[i], arglength) == NULL) {
-					(void)fprintf(stderr, "Could not copy %s to buffer.\n", argv[i]);
-				}
-				dirindex++;
-			} else {
-				if ((NONDIRS[nondirindex] = malloc(arglength + 1)) == NULL) {
-					(void)fprintf(stderr, "Could not allocate memory.\n");
-				}
-				
-				if (strncpy(NONDIRS[nondirindex], argv[i], arglength) == NULL) {
-					(void)fprintf(stderr, "Could not copy %s to buffer.\n", argv[i]);
-				}
-				nondirindex++;
-			}
-		} else {
-			EXIT_STATUS = EXIT_FAILURE;
-		}
-	}
-}
-
-/*
- * Reads flags and called corresponding print functions 
-*/
-void
-formatentry(int directentry, char* entry, char* path, struct stat sb, struct paddings paddings)
+formatentry(int directentry, char* entry, char* path, 
+	struct stat sb, struct paddings paddings)
 {
 	int printallflags = A_allentries || a_allentries;
 	
-	if (directentry == 0 && d_directories == 0 && printallflags == 0 && entry[0] == '.') {
+	if (directentry == 0 && d_directories == 0 && 
+		printallflags == 0 && entry[0] == '.') {
 		return;
 	}
 	
@@ -279,24 +102,19 @@ formatentry(int directentry, char* entry, char* path, struct stat sb, struct pad
 void
 formatdir(char* dir) 
 {
-	int blocksum, currentlevel, fileinfo;
-	int ftsopenflags, printallflags, ignoredflag, outputflag;
-	int blockpadding, userpadding, grouppadding, sizepadding, inodepadding;
 	char *dirptr[2];
+	int blocksum, currentlevel, fileinfo;
+	int ftsopenflags, ignoredflag, outputflag, printallflags;
+	int blockpadding, userpadding, grouppadding, sizepadding, inodepadding;
+	static const struct paddings resetpaddings;
 	paddings paddings;
-	FTSENT *blockchildren, *entry, *recursivechildren;
+	FTSENT *blockchildren, *entry, *immediatechildren;
 	FTS *directory;
 
 	
 	int (*comparefunction)(const FTSENT **, const FTSENT **);
-	paddings.block = 0;
-	paddings.user = 0;
-	paddings.group = 0;
-	paddings.size = 0;
-	paddings.inode = 0;
-	paddings.link = 0;
-	paddings.major = 0;
-	paddings.minor = 0;
+	
+	paddings = resetpaddings;
 
 	comparefunction = &fts_lexicosort;
 	
@@ -354,71 +172,55 @@ formatdir(char* dir)
 		return;
 	}
 	
-	if (R_recurse == 0) {
-		while((entry = fts_read(directory)) != NULL) {
-			fileinfo = entry->fts_info;
-			if (fileinfo == FTS_DP) {
-				continue;
-			}
-			if (entry->fts_level > 0  && fileinfo == FTS_D) {
-				if (fts_set(directory, entry, FTS_SKIP) != 0) {
-					(void)fprintf(stderr, "Could not set fts options.\n");
-					EXIT_STATUS = 1;
-					continue;
-				}
-			}
-			blocksum = 0;
-			if (l_longformat ==1 || n_numericalids == 1|| s_systemblocks == 1 || isatty(1) == 0) {
-				if (entry->fts_level == 0 && (blockchildren = fts_children(directory, 0)) != NULL) {
-					blocksum = countblocks(blockchildren, &paddings);
-					printblocks_s(blocksum, blocksum, 0, paddings.block);
-				}
-			}
-			if (entry->fts_level > 0) {
-				formatentry(0, entry->fts_name, entry->fts_path, *entry->fts_statp, paddings); 
-			}
-		}	
-	} else {
-		outputflag = 0;
-		printallflags = A_allentries || a_allentries;
+	outputflag = 0;
+	printallflags = A_allentries || a_allentries;
 
-		while((entry = fts_read(directory)) != NULL) {
-			fileinfo = entry->fts_info;
-			if (fileinfo == FTS_DP) {
+	while((entry = fts_read(directory)) != NULL) {
+		fileinfo = entry->fts_info;
+		currentlevel = entry->fts_level;
+		blocksum = 0;
+		ignoredflag = 0;
+	
+		/* Only gets children of pre-order visits  */	
+		if (fileinfo != FTS_D) {
+			continue;
+		}
+		
+		/* Prevents recursing into subdirectories*/
+		if (R_recurse == 0) {
+			if (fts_set(directory, entry, FTS_SKIP) != 0) {
+				(void)fprintf(stderr, "Could not set fts options.\n");
+				EXIT_STATUS = 1;
 				continue;
 			}
-			currentlevel = entry->fts_level;
-			blocksum = 0;
-			ignoredflag = 0;
-			if (printallflags == 0 && strncmp(entry->fts_name, ".", 1) == 0 && currentlevel != 0) { 
-				ignoredflag = 1;
-			}
-			if (fileinfo == FTS_D) {
-				if (ignoredflag == 0 && outputflag == 1) {
-					printf("\n%s:\n", entry->fts_path);
-				}
-				paddings.block = 0;
-				paddings.user = 0;
-				paddings.group = 0;
-				paddings.size = 0;
-				paddings.inode = 0;
-				paddings.link = 0;
-				paddings.major = 0;
-				paddings.minor = 0;
-			}
+		}
+	
+		/* Ignore hidden directories by default  */	
+		if (printallflags == 0 && strncmp(entry->fts_name, ".", 1) == 0 && 
+			currentlevel != 0) { 
+			ignoredflag = 1;
+		}
 		
-			outputflag = 1;
-			if (ignoredflag == 0 && (l_longformat == 1|| n_numericalids == 1 || s_systemblocks == 1 || isatty(1) == 0)) {
-				if ((blockchildren = fts_children(directory, 0)) != NULL) {
-					blocksum = countblocks(blockchildren, &paddings); 
-					printblocks_s(blocksum, blocksum,  0, paddings.block);
-				}
+		if (ignoredflag == 0 && outputflag == 1) {
+			printf("\n%s:\n", entry->fts_path);
+		}
+		paddings = resetpaddings;
+		outputflag = 1;
+	
+		/* Counts and prints blocks if relevant flags are set  */	
+		if (ignoredflag == 0 && 
+			(l_longformat == 1|| n_numericalids == 1 || s_systemblocks == 1 || isatty(1) == 0)) {
+			if ((blockchildren = fts_children(directory, 0)) != NULL) {
+				blocksum = countblocks(blockchildren, &paddings); 
+				printblocks_s(blocksum, blocksum,  0, paddings.block);
 			}
-			if (ignoredflag == 0 && (recursivechildren = fts_children(directory, 0)) != NULL) {	
-				getimmediatechildren(recursivechildren, currentlevel, &paddings); 
-			}
-		}	
-	}
+		}
+		/* If current entry isn't ignored, get all of its children  */
+		if (ignoredflag == 0 && (immediatechildren = fts_children(directory, 0)) != NULL) {	
+			getimmediatechildren(immediatechildren, currentlevel, &paddings); 
+		}
+	}	
+	
 	fts_close(directory);
 	free(dirptr[0]);
 	free(dirptr[1]);
@@ -451,15 +253,16 @@ main(int argc, char **argv)
 	int i, argoffset, outputflag;
 	struct stat sb;
 	paddings paddings;
+	static const struct paddings resetpaddings;
 	
 	setprogname(argv[0]);
-	
- 	EXIT_STATUS = 0;	
+ 	
+	EXIT_STATUS = 0;	
 	NUMDIRS = 0;
 	NUMNONDIRS = 0;
 	argoffset = 0;
 	
-	if (parseargs(argc, argv)) {
+	if (parseargs(argc, argv) == 1) {
 		argoffset = 1;
 	}
 	 
@@ -472,13 +275,15 @@ main(int argc, char **argv)
 				NUMNONDIRS++;
 			}
 		} else {
-			(void)fprintf(stderr, "%s: %s: No such file or directory\n", getprogname(), argv[i]);
+			(void)fprintf(stderr, "%s: %s: No such file or directory\n"
+				, getprogname(), argv[i]);
 			EXIT_STATUS = EXIT_FAILURE;
 			if (i == argc - 1 && i == 1 + argoffset) {
 				exit(EXIT_STATUS);
 			}
 		}
 	}
+	
 	if (NUMDIRS > 0 &&  (DIRS = malloc(NUMDIRS * sizeof(char*))) == NULL) {
 		(void)fprintf(stderr, "Memory could not be allocated");
 		exit(EXIT_FAILURE);
@@ -495,24 +300,18 @@ main(int argc, char **argv)
 	qsort(NONDIRS, NUMNONDIRS, sizeof(char*), lexicosort);	
 	qsort(DIRS, NUMDIRS, sizeof(char*), lexicosort);
 
-	outputflag = 0;
-	
+
 	if (l_longformat  == 1|| n_numericalids == 1) {
-		paddings.block = 0;
-		paddings.user = 0;
-		paddings.group = 0;
-		paddings.size = 0;
-		paddings.inode = 0;
-		paddings.link = 0;
-		paddings.major = 0;
-		paddings.minor = 0;
+		paddings = resetpaddings;
 		for (i = 0; i < NUMNONDIRS; i++) {
 			if (stat(NONDIRS[i], &sb) == 0) {
 				getpaddingsizes(sb, &paddings);	
 			}
 		}					
 	}
-	/* Visits non directory entries and then directory entries */	
+	
+	outputflag = 0;
+	/* Formats non directory entries and then directory entries */	
 	for (i = 0; i < NUMNONDIRS; i++) {
 		if (stat(NONDIRS[i], &sb) != 0) {
 			(void)fprintf(stderr, "%s: cannot access %s: No such file or directory.\n"

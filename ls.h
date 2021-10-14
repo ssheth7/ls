@@ -5,8 +5,6 @@
 
 #include "helpers.h"
 
-int parseargs(int, char*[]);
-void splitargs(int, char*[], int);
 void formatentry(int, char*, char*, struct stat, struct paddings);
 void formatdir(char*);
 void cleanup();

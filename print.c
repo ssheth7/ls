@@ -4,9 +4,12 @@
 
 #include <sys/stat.h>
 
+#include <machine/int_fmtio.h>
+
 #include <ctype.h>
 #include <errno.h>
 #include <grp.h>
+#include <inttypes.h>
 #include <math.h>
 #include <pwd.h>
 #include <libgen.h>
@@ -44,12 +47,15 @@ extern int w_forcenonprintable; /* Forces raw nonprintable characters  */
 extern long BLOCKSIZE;
 extern int EXIT_STATUS;
 
-#define CEIL(w, x, y) (1 + (w - 1)/(x / y))
+#define CEIL(w, x) (1 + (w - 1)/(x / 512))
 
+/*
+ * Modifies pointers to include mode symbols
+*/
 void
 addsymbols_F(char** entry, struct stat sb)
 {
-	int entrymode;
+	int entrymode, symboladded;
 	char appended;
 	char* modifiedentry;
 	
@@ -58,7 +64,7 @@ addsymbols_F(char** entry, struct stat sb)
 	}
 	
 	entrymode = sb.st_mode;
-			
+	symboladded = 1;
 	if (S_ISDIR(entrymode)) {
 		appended = '/';
 	} else if (S_ISLNK(entrymode)) {
@@ -72,20 +78,27 @@ addsymbols_F(char** entry, struct stat sb)
 	} else if (S_IEXEC & entrymode) {
 		appended = '*';
 	} else {
-		free(modifiedentry);
-		return;
+		symboladded = 0;
 	}
-	snprintf(modifiedentry, strlen(*entry) + 2, "%s%c", *entry, appended);
-	*entry = modifiedentry;
+	if (symboladded == 1) {
+		snprintf(modifiedentry, strlen(*entry) + 2, "%s%c", *entry, appended);
+		*entry = modifiedentry; 
+	}
 	free(modifiedentry);
 }
 
+/*
+ * Basic printing function
+*/
 void
 printdefault(char* entry)
 {
 	(void)printf("%s\n", entry);
 }
 
+/*
+ * Replaces all unprintable characters with '?'
+*/
 void
 printraw_q(char* entry)
 {
@@ -106,34 +119,40 @@ printraw_q(char* entry)
 	}
 }
 
-
 void
 printinode_i(struct stat sb, int padding) 
 {
 	(void)printf("%*ld ", padding, sb.st_ino);
 }
 
+/*
+ * Formats blocks and prints files blocks and total blocks
+*/
 void
 printblocks_s(int blocks, int size, int isEntry, int blockpadding)
 {
 	int humanizeflags;
 	char buf[6];
-	long defaultblocksize = 512;
-	long dblocks = ceil(dblocks / (BLOCKSIZE / defaultblocksize));
-	if (!h_humanreadable) {
+	long defaultblocksize; 
+	
+	if (h_humanreadable == 0) {
 		if (isEntry == 1) {
-			(void)printf("%*ld ", blockpadding, CEIL(blocks, BLOCKSIZE, defaultblocksize));
+			(void)printf("%*" PRIdMAX " ", blockpadding, (intmax_t)CEIL(blocks, 
+				BLOCKSIZE));
 		} else {
-			(void)printf("total %ld\n", CEIL(blocks, BLOCKSIZE, defaultblocksize));
+			(void)printf("total %" PRIdMAX "\n", (intmax_t)CEIL(blocks, 
+				BLOCKSIZE));
 		}
 		return;	
 	}
 	
-	if ((n_numericalids || l_longformat) && isEntry) {
+	if ((n_numericalids  == 1|| l_longformat == 1) && isEntry == 1) {
 		size = blocks * BLOCKSIZE;
 	}
+	
 	humanizeflags = HN_DECIMAL | HN_B | HN_NOSPACE;
-	if (humanize_number(buf, sizeof(buf), size , " ",  HN_AUTOSCALE, humanizeflags) == -1) {
+	if (humanize_number(buf, sizeof(buf), size , " ",  
+		HN_AUTOSCALE, humanizeflags) == -1) {
 		(void)fprintf(stderr, "Humanize function failed: %s\n", strerror(errno)); 
 		EXIT_STATUS = EXIT_FAILURE;
 	}
@@ -144,20 +163,22 @@ printblocks_s(int blocks, int size, int isEntry, int blockpadding)
 	}
 }
 
-// Make print pretty
+/* Prints the long format of an entry */ 
 void
-printlong_l(char* entry, char* path, struct stat sb, struct paddings paddings) 
+printlong_l(char* entry, char* path, struct stat sb, 
+struct paddings paddings) 
 {
-	int invalidgid, invaliduid, humanizeflags;
-	int entrymode, majornum, minornum, numlinks;
-	int hpadding, len;
-	int currentyear, fileyear;	
-	dev_t devicetype;
 	char sizebuf[6];
 	char permbuf[12];
 	char timebuf[13];
 	char linkbuf[PATH_MAX], fullpath[PATH_MAX], currentdir[PATH_MAX];
 	char* timeformat;
+	
+	int invalidgid, invaliduid, humanizeflags;
+	int entrymode, majornum, minornum, numlinks;
+	int hpadding, len;
+	int currentyear, fileyear;	
+	dev_t devicetype;
 	time_t currentepochtime, fileepochtime;
 	uid_t uid;
 	gid_t gid;
@@ -249,7 +270,7 @@ printlong_l(char* entry, char* path, struct stat sb, struct paddings paddings)
 		} else {
 			humanizeflags = HN_DECIMAL | HN_B | HN_NOSPACE;
 			if (humanize_number(sizebuf, sizeof(sizebuf), sb.st_size , " ",  
-			HN_AUTOSCALE, humanizeflags) == -1) {
+				HN_AUTOSCALE, humanizeflags) == -1) {
 				(void)fprintf(stderr, "Humanize function failed: %s\n", strerror(errno)); 
 				EXIT_STATUS = EXIT_FAILURE;
 			}
@@ -269,7 +290,7 @@ printlong_l(char* entry, char* path, struct stat sb, struct paddings paddings)
 			minornum = minor(devicetype);
 			(void)printf(" %*d,%*d ", paddings.major, majornum, paddings.minor, minornum);
 		} else { 
-			(void)printf(" %*d ", paddings.size + 1, sb.st_size);
+			(void)printf(" %*" PRIdMAX " ", (intmax_t)(paddings.size + 1), sb.st_size);
 		}
 	}
 	
@@ -291,10 +312,10 @@ printlong_l(char* entry, char* path, struct stat sb, struct paddings paddings)
 	if (S_ISLNK(entrymode)) {
 		if ((len = readlink(fullpath, linkbuf, sizeof(linkbuf) - 1)) != -1) {
 			linkbuf[len] = '\0';
-			printf("-> %s", linkbuf);
+			printf(" -> %s", linkbuf);
 		} else if  ((len = readlink(entry, linkbuf, sizeof(linkbuf) - 1)) != -1){
 			linkbuf[len] = '\0';
-			printf("-> %s", linkbuf);
+			printf(" -> %s", linkbuf);
 		} 
 	}	
 	printf("\n");

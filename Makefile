@@ -1,7 +1,7 @@
 CC = cc
 CFLAGS= -Wall -Werror -Wextra
 TARGET = ls
-SOURCES = ls.o helpers.o print.o 
+SOURCES = ls.o helpers.o print.o cmp.o
 
 debug: $(SOURCES)  
 	$(CC) $(CFLAGS) $(SOURCES) -g -o $(TARGET)
@@ -16,6 +16,7 @@ print.o: print.c print.h
 
 helpers.o: helpers.c helpers.h
 	$(CC) -g -c helpers.c
-
+cmp.o: cmp.c cmp.h
+	$(CC) -g -c cmp.c
 clean:
 	rm -f ls *.o

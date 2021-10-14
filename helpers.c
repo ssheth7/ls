@@ -1,5 +1,5 @@
 /*
- * Contains sorting helper methods for ls.c
+ * Contains helper methods for traversal
 */
 #include <sys/stat.h>
 
@@ -38,7 +38,16 @@ extern int t_modifiedsorted;    /* Sort by time modified */
 extern int u_lastaccess;        /* Shows time of last access  */                          
 extern int w_forcenonprintable; /* Forces raw nonprintable characters  */ 
 
+extern long BLOCKSIZE;
+extern int EXIT_STATUS;
+extern int NUMDIRS;
+extern int NUMNONDIRS;
+extern char **DIRS;
+extern char **NONDIRS;
 
+/*
+ * Gets all the immediate children of a directory and formats each child
+*/
 void
 getimmediatechildren(FTSENT* children, int parentlevel, struct paddings *paddings) 
 {
@@ -51,6 +60,9 @@ getimmediatechildren(FTSENT* children, int parentlevel, struct paddings *padding
 	}
 }
 
+/*
+ * Counts the number of block in a directory given a directory structure
+*/
 int 
 countblocks(FTSENT *children, struct paddings *paddings)
 {
@@ -81,6 +93,9 @@ countblocks(FTSENT *children, struct paddings *paddings)
 	return blocksum;
 }
 
+/*
+ * Updates the print paddings if longer elements exist
+*/
 void
 getpaddingsizes(struct stat sb, struct paddings *paddings) 
 {
@@ -156,6 +171,9 @@ getpaddingsizes(struct stat sb, struct paddings *paddings)
 		}
 	}
 }
+/*
+ * Counts the digits in a number
+*/
 int
 countdigits(long digit)
 {
@@ -167,134 +185,187 @@ countdigits(long digit)
 	}
 	return numdigits;
 }
+
+/*
+ * Parses command line arguments and sets option flags
+*/
 int
-lexicosort(const void* str1, const void* str2) 
-{
-	return strcmp(*(const char **) str1, *(const char **) str2);
+parseargs(int argc, char **argv)
+{	
+	int opt, flagsset, envlength;
+	char* blocksize;
+		
+	if (isatty(1)) {
+		q_forcenonprintable = 1;	
+	}
+	BLOCKSIZE = 512; 
+	flagsset = 0;
+	while ((opt = getopt(argc, argv, "AacdFfhiklnqRrSstuw")) != -1) {
+		flagsset = 1;
+		switch (opt) {
+			case 'A':
+				A_allentries = 1;
+				break;
+			case 'a':
+				a_allentries = 1;
+				A_allentries = 0;
+				break;
+			case 'c':
+				if (f_unsorted == 1) {
+					break;
+				}
+				c_lastchanged = 1;
+				u_lastaccess = 0;
+				break;
+			case 'd':
+				d_directories = 1;
+				break;
+			case 'F':
+				F_specialsymbols = 1;
+				break;
+			case 'f':
+				f_unsorted = a_allentries = 1;
+				r_reverseorder = S_sizesorted = u_lastaccess = c_lastchanged = 0;
+				break;
+			case 'h':
+				h_humanreadable = 1;
+				k_kilobytes = 0;
+				break;
+			case 'i':
+				i_inodes = 1;
+				break;
+			case 'k':
+				k_kilobytes = 1;
+				h_humanreadable = 0;
+				BLOCKSIZE = 1024;
+				break;
+			case 'l':
+				l_longformat = 1;
+				n_numericalids = 0;
+				break;
+			case 'n':
+				n_numericalids = 1;
+				l_longformat = 0;
+				break;
+			case 'q':
+				q_forcenonprintable = 1;
+				break;
+			case 'R':
+				R_recurse = 1;
+				break;
+			case 'r':
+				if (f_unsorted == 1) {
+					break;
+				}
+				r_reverseorder = 1;
+				break;
+			case 'S':
+				if (f_unsorted == 1) {
+					break;
+				}
+				S_sizesorted = 1;
+				break;
+			case 's':
+				s_systemblocks = 1;
+				break;
+			case 't':
+				if (f_unsorted == 1) {
+					break;
+				}
+				t_modifiedsorted = 1;
+				break;
+			case 'u':
+				if (f_unsorted == 1) {
+					break;
+				}
+				u_lastaccess = 1;
+				c_lastchanged = 0;
+				break;
+			case 'w':
+				q_forcenonprintable = 0;
+				break;
+			default:
+				(void)fprintf(stderr, "%s [-AacdFfhiklnqRrSstuw] [file ...]\n", getprogname());
+				/* NOTREACHED */
+				exit(EXIT_FAILURE);
+		}
+	}
+	if (getuid() == 0 && a_allentries == 0) {
+		A_allentries = 1;
+	}
+	if (s_systemblocks == 1 && h_humanreadable == 0 && k_kilobytes == 0) {
+		getbsize(NULL, &BLOCKSIZE);
+	}
+	return flagsset;
 }
 
-int 
-fts_lexicosort(const FTSENT** file1, const FTSENT** file2)
+/*
+ * Splits arguments into DIR and NONDIR arrays
+*/
+void
+splitargs(int argc, char **argv, int offset)
 {
+	int i, dirindex, nondirindex, arglength;
+	struct stat sb;
+	dirindex = 0;
+	nondirindex = 0;
 	
-	return (strcmp((*file1)->fts_name, (*file2)->fts_name));
-}
-
-int 
-fts_rlexicosort(const FTSENT** file1, const FTSENT** file2)
-{
+	if (NUMDIRS == 0 && NUMNONDIRS == 0) { /* If no command line arguments are provided */
+		if (d_directories == 0){
+			NUMDIRS++;
+			if ((DIRS = malloc(NUMDIRS * sizeof(char*))) == NULL) {
+				(void)fprintf(stderr, "Memory could not be allocated");
+				exit(EXIT_FAILURE);
+			}
+			if ((DIRS[0] = malloc(strlen(".") + 1)) == NULL) {
+				(void)fprintf(stderr, "Could not allocate memory.\n");
+				exit(EXIT_FAILURE);
+			}
+			if (strncpy(DIRS[0], ".", strlen(".")) == NULL) {
+				(void)fprintf(stderr, "Could not copy to destination\n");
+				exit(EXIT_FAILURE);
+			}
+		} else {
+			NUMNONDIRS++;
+			if ((NONDIRS = malloc(NUMNONDIRS * sizeof(char*))) == NULL) {
+				(void)fprintf(stderr, "Memory could not be allocated");
+				exit(EXIT_FAILURE);
+			}
+			if ((NONDIRS[0] = malloc(strlen(".") + 1)) == NULL) {
+				(void)fprintf(stderr, "Could not allocate memory.\n");
+				exit(EXIT_FAILURE);
+			}
+			if (strncpy(NONDIRS[0], ".", strlen(".")) == NULL) {
+				(void)fprintf(stderr, "Could not copy to destination\n");
+				exit(EXIT_FAILURE);
+			}
+		}
+	}
 	
-	return -1 * (strcmp((*file1)->fts_name, (*file2)->fts_name));
-}
+	for (i = 1 + offset; i < argc; i++){
 
-int 
-fts_sizesort(const FTSENT** file1, const FTSENT** file2)
-{
-	off_t file1size = (*file1)->fts_statp->st_size;
-	off_t file2size = (*file2)->fts_statp->st_size;
-	if (file1size < file2size) {
-		return 1;
-	} 
-	if (file1size > file2size) {
-		return -1;
+		if (stat(argv[i], &sb) == 0) {
+			arglength = strlen(argv[i]);
+			if (S_ISDIR(sb.st_mode) && d_directories == 0) {
+				if ((DIRS[dirindex] = malloc(arglength + 1)) == NULL) {
+					(void)fprintf(stderr, "Could not allocate memory.\n");
+				}
+				if (strncpy(DIRS[dirindex], argv[i], arglength) == NULL) {
+					(void)fprintf(stderr, "Could not copy %s to buffer.\n", argv[i]);
+				}
+				dirindex++;
+			} else {
+				if ((NONDIRS[nondirindex] = malloc(arglength + 1)) == NULL) {
+					(void)fprintf(stderr, "Could not allocate memory.\n");
+				}
+				
+				if (strncpy(NONDIRS[nondirindex], argv[i], arglength) == NULL) {
+					(void)fprintf(stderr, "Could not copy %s to buffer.\n", argv[i]);
+				}
+				nondirindex++;
+			}
+		} else {
+			EXIT_STATUS = EXIT_FAILURE;
+		}
 	}
-	return fts_lexicosort(file1, file2);
-}
-
-int 
-fts_rsizesort(const FTSENT** file1, const FTSENT** file2)
-{
-	off_t file1size = (*file1)->fts_statp->st_size;
-	off_t file2size = (*file2)->fts_statp->st_size;
-	if (file1size < file2size) {
-		return -1;
-	} 
-	if (file1size > file2size) {
-		return 1;
-	}
-	return fts_rlexicosort(file1, file2);
-}
-
-int
-fts_timemodifiedsort(const FTSENT** file1, const FTSENT** file2)
-{
-	time_t file1time = (*file1)->fts_statp->st_mtime;
-	time_t file2time = (*file2)->fts_statp->st_mtime;
-	if (file1time < file2time) {
-		return 1;
-	}	
-	if (file1time > file2time) {
-		return -1;
-	}
-	return fts_lexicosort(file1, file2);
-}
-
-int
-fts_rtimemodifiedsort(const FTSENT** file1, const FTSENT** file2)
-{
-	time_t file1time = (*file1)->fts_statp->st_mtime;
-	time_t file2time = (*file2)->fts_statp->st_mtime;
-	if (file1time < file2time) {
-		return -1;
-	}	
-	if (file1time > file2time) {
-		return 1;
-	}
-	return fts_lexicosort(file1, file2);
-}
-
-int
-fts_lastaccesssort(const FTSENT** file1, const FTSENT** file2)
-{
-	time_t file1time = (*file1)->fts_statp->st_atime;
-	time_t file2time = (*file2)->fts_statp->st_atime;
-	if (file1time < file2time) {
-		return 1;
-	}	
-	if (file1time > file2time) {
-		return -1;
-	}
-	return fts_lexicosort(file1, file2);
-}
-
-int
-fts_rlastaccesssort(const FTSENT** file1, const FTSENT** file2)
-{
-	time_t file1time = (*file1)->fts_statp->st_atime;
-	time_t file2time = (*file2)->fts_statp->st_atime;
-	if (file1time < file2time) {
-		return -1;
-	}	
-	if (file1time > file2time) {
-		return 1;
-	}
-	return 0;
-}
-
-int
-fts_statuschangesort(const FTSENT** file1, const FTSENT** file2)
-{
-	time_t file1time = (*file1)->fts_statp->st_ctime;
-	time_t file2time = (*file2)->fts_statp->st_ctime;
-	if (file1time < file2time) {
-		return 1;
-	}	
-	if (file1time > file2time) {
-		return -1;
-	}
-	return fts_lexicosort(file1, file2);
-}
-
-int
-fts_rstatuschangesort(const FTSENT** file1, const FTSENT** file2)
-{
-	time_t file1time = (*file1)->fts_statp->st_ctime;
-	time_t file2time = (*file2)->fts_statp->st_ctime;
-	if (file1time < file2time) {
-		return -1;
-	}	
-	if (file1time > file2time) {
-		return 1;
-	}
-	return fts_lexicosort(file1, file2);
 }

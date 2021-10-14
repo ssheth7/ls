@@ -12,5 +12,5 @@ void printraw_q(char*);
 void printinode_i(struct stat, int);
 void printblocks_s(int, int, int, int);
 void printlong_l(char*, char*, struct stat, struct paddings);
-#endif /* !_PRINT_H_ */
 
+#endif /* !_PRINT_H_ */
