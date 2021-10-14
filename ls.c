@@ -28,6 +28,7 @@
  TODO:
  combine traversal logic
  run exit status tests
+ major minor padding
  documentation
 */
 
@@ -296,6 +297,9 @@ formatdir(char* dir)
 	paddings.size = 0;
 	paddings.inode = 0;
 	paddings.link = 0;
+	paddings.major = 0;
+	paddings.minor = 0;
+
 	comparefunction = &fts_lexicosort;
 	
 	if (r_reverseorder == 1) {
@@ -370,9 +374,6 @@ formatdir(char* dir)
 				if (entry->fts_level == 0 && (blockchildren = fts_children(directory, 0)) != NULL) {
 					blocksum = countblocks(blockchildren, &paddings);
 					printblocks_s(blocksum, blocksum, 0, paddings.block);
-					printf("Padding: blocks: %d user: %d group: %d size:  %d inode : %d link %d\n", 
-					paddings.block, paddings.user, paddings.group, paddings.size, 
-					paddings.inode, paddings.link);
 				}
 			}
 			if (entry->fts_level > 0) {
@@ -404,6 +405,8 @@ formatdir(char* dir)
 				paddings.size = 0;
 				paddings.inode = 0;
 				paddings.link = 0;
+				paddings.major = 0;
+				paddings.minor = 0;
 			}
 		
 			outputflag = 1;
@@ -411,8 +414,6 @@ formatdir(char* dir)
 				if ((blockchildren = fts_children(directory, 0)) != NULL) {
 					blocksum = countblocks(blockchildren, &paddings); 
 					printblocks_s(blocksum, blocksum,  0, paddings.block);
-				//	printf("Padding: blocks: %d user: %d group: %d size: %d inode : %d\n", 
-				//	blockpadding, userpadding, grouppadding, sizepadding, inodepadding);
 				}
 			}
 			if (ignoredflag == 0 && (recursivechildren = fts_children(directory, 0)) != NULL) {	
@@ -505,6 +506,8 @@ main(int argc, char **argv)
 		paddings.size = 0;
 		paddings.inode = 0;
 		paddings.link = 0;
+		paddings.major = 0;
+		paddings.minor = 0;
 		for (i = 0; i < NUMNONDIRS; i++) {
 			if (stat(NONDIRS[i], &sb) == 0) {
 				getpaddingsizes(sb, &paddings);	

@@ -84,10 +84,12 @@ countblocks(FTSENT *children, struct paddings *paddings)
 void
 getpaddingsizes(struct stat sb, struct paddings *paddings) 
 {
-	int digitlen, gid, links, uid;
+	int digitlen, gid, links, majornum, minornum, uid;
 	blkcnt_t blocks;
 	ino_t inode;
+	mode_t mode;
 	off_t size;
+	dev_t devicetype;
 	struct group *group;
 	struct passwd *passwd;
 
@@ -95,6 +97,8 @@ getpaddingsizes(struct stat sb, struct paddings *paddings)
 	size = sb.st_size;
 	uid = sb.st_uid;
 	gid = sb.st_gid;
+	mode = sb.st_mode;
+	devicetype = sb.st_rdev;
 	inode = sb.st_ino;
 	links = sb.st_nlink;
 	digitlen = 0;
@@ -135,12 +139,24 @@ getpaddingsizes(struct stat sb, struct paddings *paddings)
 	if (digitlen > paddings->inode) {
 		paddings->inode = digitlen;
 	}
+
+	if (S_ISBLK(mode) || S_ISCHR(mode)) {
+		majornum = major(devicetype);
+		minornum = minor(devicetype);	
+		digitlen = countdigits(majornum);
+		if (digitlen > paddings->major) {
+			paddings->major = digitlen;
+		}
+		digitlen = countdigits(minornum);
+		if (digitlen > paddings->minor) {
+			paddings->minor = digitlen;
+		}
+	}
 }
 int
 countdigits(long digit)
 {
 	int numdigits;
-
 	numdigits = 0;
 	while (digit > 0){
 		numdigits++;

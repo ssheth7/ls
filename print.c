@@ -149,8 +149,9 @@ void
 printlong_l(char* entry, char* path, struct stat sb, struct paddings paddings) 
 {
 	int invalidgid, invaliduid, humanizeflags;
-	int entrymode, numlinks, len;
+	int entrymode, majornum, minornum, numlinks, len;
 	int currentyear, fileyear;
+	dev_t devicetype;
 	char sizebuf[6];
 	char permbuf[12];
 	char timebuf[13];
@@ -197,9 +198,9 @@ printlong_l(char* entry, char* path, struct stat sb, struct paddings paddings)
 	filetime = localtime(&fileepochtime);
 	fileyear = filetime->tm_year + 1900;	
 	
-	timeformat = "%b %d %k:%M";
+	timeformat = "%b %e %k:%M";
 	if (fileyear != currentyear) {
-		timeformat = "%b %d  %Y";
+		timeformat = "%b %e  %Y";
 	} 
 	if (strftime(timebuf, sizeof(timebuf), timeformat, filetime) == 0) {
 		fprintf(stderr, "Could not format date of %s.\n", entry); 
@@ -238,6 +239,11 @@ printlong_l(char* entry, char* path, struct stat sb, struct paddings paddings)
 			EXIT_STATUS = EXIT_FAILURE;
 		}
 		printf(" %6s", sizebuf);	
+	} else if (S_ISBLK(entrymode) || S_ISCHR(entrymode)) {
+		devicetype = sb.st_rdev;
+		majornum = major(devicetype);
+		minornum = minor(devicetype);
+		printf("% *d,%*d ", paddings.major, majornum, paddings.minor, minornum);
 	} else {
 		printf(" %*d ", paddings.size + 1, sb.st_size);
 	}

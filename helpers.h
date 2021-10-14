@@ -13,6 +13,8 @@ typedef struct paddings {
 	int group;
 	int inode;
 	int link;
+	int major;
+	int minor;
 	int size;
 	int user;
 } paddings;
