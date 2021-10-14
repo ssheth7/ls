@@ -107,18 +107,21 @@ getpaddingsizes(struct stat sb, struct paddings *paddings)
 	if (digitlen > paddings->block) {
 		paddings->block = digitlen;
 	}
+
 	digitlen = countdigits(size);
 	if (digitlen > paddings->size) {
 		paddings->size = digitlen;
 	}
+
 	digitlen = countdigits(links);
 	if (digitlen > paddings->link) {
 		paddings->link = digitlen;
 	}
+
 	if (n_numericalids == 1 || (passwd = getpwuid(uid)) == NULL) {
-		digitlen = countdigits(uid);
+		digitlen = countdigits(uid) + 1;
 	} else {
-		digitlen = strlen(passwd->pw_name);
+		digitlen = strlen(passwd->pw_name) + 1;
 	}
 	if (digitlen > paddings->user) {
 		paddings->user = digitlen;
@@ -143,11 +146,11 @@ getpaddingsizes(struct stat sb, struct paddings *paddings)
 	if (S_ISBLK(mode) || S_ISCHR(mode)) {
 		majornum = major(devicetype);
 		minornum = minor(devicetype);	
-		digitlen = countdigits(majornum);
+		digitlen = countdigits(majornum) + 1;
 		if (digitlen > paddings->major) {
 			paddings->major = digitlen;
 		}
-		digitlen = countdigits(minornum);
+		digitlen = countdigits(minornum) + 1;
 		if (digitlen > paddings->minor) {
 			paddings->minor = digitlen;
 		}

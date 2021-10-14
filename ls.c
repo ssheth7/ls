@@ -27,8 +27,6 @@
 /*
  TODO:
  combine traversal logic
- run exit status tests
- major minor padding
  documentation
 */
 
@@ -542,6 +540,5 @@ main(int argc, char **argv)
 	}
 
 	cleanup(DIRS, NONDIRS);
-	printf("Program exited with status: %d\n", EXIT_STATUS);
 	exit(EXIT_STATUS);
 }

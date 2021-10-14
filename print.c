@@ -149,8 +149,9 @@ void
 printlong_l(char* entry, char* path, struct stat sb, struct paddings paddings) 
 {
 	int invalidgid, invaliduid, humanizeflags;
-	int entrymode, majornum, minornum, numlinks, len;
-	int currentyear, fileyear;
+	int entrymode, majornum, minornum, numlinks;
+	int hpadding, len;
+	int currentyear, fileyear;	
 	dev_t devicetype;
 	char sizebuf[6];
 	char permbuf[12];
@@ -203,7 +204,7 @@ printlong_l(char* entry, char* path, struct stat sb, struct paddings paddings)
 		timeformat = "%b %e  %Y";
 	} 
 	if (strftime(timebuf, sizeof(timebuf), timeformat, filetime) == 0) {
-		fprintf(stderr, "Could not format date of %s.\n", entry); 
+		(void)fprintf(stderr, "Could not format date of %s.\n", entry); 
 		EXIT_STATUS = EXIT_FAILURE;
 	}
 	timebuf[12] = '\0';
@@ -214,46 +215,70 @@ printlong_l(char* entry, char* path, struct stat sb, struct paddings paddings)
 	}
 	
 	if (invalidgid == 1 && invaliduid == 0) {
-		printf("%s %*d %-*s %-*d", 
-		permbuf, paddings.link, numlinks, paddings.user + 1, 
+		(void)printf("%s %*d %-*s %-*d", 
+		permbuf, paddings.link, numlinks, paddings.user, 
 		passwd->pw_name, paddings.group, gid);
 	} else if (invalidgid == 0 && invaliduid == 1) {
-		printf("%s %*d %-*d %-*s", 
-		permbuf, paddings.link, numlinks, paddings.user + 1, uid, 
+		(void)printf("%s %*d %-*d %-*s", 
+		permbuf, paddings.link, numlinks, paddings.user, uid, 
 		paddings.group, group->gr_name);
 	} else if (invalidgid == 1 && invaliduid == 1) {
-		printf("%s %*d %-*d %-*d", 
-		permbuf, paddings.link, numlinks, paddings.user + 1, uid, 
+		(void)printf("%s %*d %-*d %-*d", 
+		permbuf, paddings.link, numlinks, paddings.user, uid, 
 		paddings.group, gid);
 	} else {
-		printf("%s %*d %-*s %-*s", 
-		permbuf, paddings.link, numlinks, paddings.user + 1, passwd->pw_name,
+		(void)printf("%s %*d %-*s %-*s", 
+		permbuf, paddings.link, numlinks, paddings.user, passwd->pw_name,
 		 paddings.group, group->gr_name);
 	}
-	
+
 	if (h_humanreadable == 1) {
-		humanizeflags = HN_DECIMAL | HN_B | HN_NOSPACE;
-		if (humanize_number(sizebuf, sizeof(sizebuf), sb.st_size , " ",  
-		HN_AUTOSCALE, humanizeflags) == -1) {
-			(void)fprintf(stderr, "Humanize function failed: %s\n", strerror(errno)); 
-			EXIT_STATUS = EXIT_FAILURE;
+		hpadding = sizeof(sizebuf);	
+		/* Major/Minor numbers take up more space than size  */
+		if (paddings.minor + paddings.major  > 6) {
+			hpadding = paddings.minor + paddings.major + 2;	
+		} else {  /* Size numbers take up more space than major/minor numbers  */
+			paddings.major = hpadding - paddings.minor - paddings.major;
 		}
-		printf(" %6s", sizebuf);	
-	} else if (S_ISBLK(entrymode) || S_ISCHR(entrymode)) {
-		devicetype = sb.st_rdev;
-		majornum = major(devicetype);
-		minornum = minor(devicetype);
-		printf("% *d,%*d ", paddings.major, majornum, paddings.minor, minornum);
+		
+		if (S_ISBLK(entrymode) || S_ISCHR(entrymode)) {
+			devicetype = sb.st_rdev;
+			majornum = major(devicetype);
+			minornum = minor(devicetype);
+			(void)printf(" %*d,%*d ", paddings.major, majornum, paddings.minor, minornum);
+		} else {
+			humanizeflags = HN_DECIMAL | HN_B | HN_NOSPACE;
+			if (humanize_number(sizebuf, sizeof(sizebuf), sb.st_size , " ",  
+			HN_AUTOSCALE, humanizeflags) == -1) {
+				(void)fprintf(stderr, "Humanize function failed: %s\n", strerror(errno)); 
+				EXIT_STATUS = EXIT_FAILURE;
+			}
+			(void)printf(" %*s", hpadding, sizebuf);	
+		}
 	} else {
-		printf(" %*d ", paddings.size + 1, sb.st_size);
+		/* Major/Minor numbers take up more space than size  */
+		if (paddings.minor + paddings.major> paddings.size) {
+			paddings.size = paddings.minor + paddings.major;
+		} else {  /* Size numbers take up more space than major/minor numbers  */
+			paddings.major = paddings.size - paddings.minor - paddings.major + 2;
+		}
+		
+		if (S_ISBLK(entrymode) || S_ISCHR(entrymode)) {
+			devicetype = sb.st_rdev;
+			majornum = major(devicetype);
+			minornum = minor(devicetype);
+			(void)printf(" %*d,%*d ", paddings.major, majornum, paddings.minor, minornum);
+		} else { 
+			(void)printf(" %*d ", paddings.size + 1, sb.st_size);
+		}
 	}
 	
-	printf("%11s ", timebuf);
+	(void)printf("%11s ", timebuf);
 	
 	if (q_forcenonprintable == 1) {
 		printraw_q(entry);
 	} else {
-		printf("%s ", entry);
+		(void)printf("%s ", entry);
 	}
 
 	len = strlen(path) + 1 + strlen(basename(entry));
