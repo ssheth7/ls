@@ -1,13 +1,6 @@
 #ifndef _HELPERS_H_
 #define _HELPERS_H_
 
-#include <sys/stat.h>
-
-#include <fts.h>
-#include <limits.h>
-#include <string.h>
-
-
 typedef struct paddings {
 	int block;
 	int group;

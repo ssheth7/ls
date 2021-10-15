@@ -1,5 +1,5 @@
 /*
- * Contains print helper functions for ls.c
+ * 10/15/2021
 */
 
 #include <sys/stat.h>
@@ -8,11 +8,11 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <fts.h>
 #include <grp.h>
-#include <inttypes.h>
-#include <math.h>
 #include <pwd.h>
 #include <libgen.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,8 +20,6 @@
 #include <unistd.h>
 
 #include "helpers.h"
-#include "print.h"
-
 
 /* flags  */
 extern int A_allentries;        /* Includes all files but current/previous directory  */
@@ -47,24 +45,29 @@ extern int w_forcenonprintable; /* Forces raw nonprintable characters  */
 extern long BLOCKSIZE;
 extern int EXIT_STATUS;
 
+/* 
+ * Ceiling divide to calculate the number of blocks with a given blocksize 
+*/
 #define CEIL(w, x) (1 + (w - 1)/(x / 512))
 
 /*
- * Modifies pointers to include mode symbols
+ * Modifies string pointers to include mode symbols
 */
 void
 addsymbols_F(char** entry, struct stat sb)
 {
-	int entrymode, symboladded;
 	char appended;
+	int entrymode, symboladded;
 	char* modifiedentry;
 	
 	if ((modifiedentry = malloc(strlen(*entry) + 2)) == NULL) {
 		(void)fprintf(stderr, "Could not allocate memory: %s\n", strerror(errno));
+		EXIT_STATUS = EXIT_FAILURE;
 	}
 	
 	entrymode = sb.st_mode;
 	symboladded = 1;
+
 	if (S_ISDIR(entrymode)) {
 		appended = '/';
 	} else if (S_ISLNK(entrymode)) {
@@ -93,6 +96,7 @@ addsymbols_F(char** entry, struct stat sb)
 void
 printdefault(char* entry)
 {
+	
 	(void)printf("%s\n", entry);
 }
 
@@ -102,9 +106,7 @@ printdefault(char* entry)
 void
 printraw_q(char* entry)
 {
-	int index;
-
-	index = 0;
+	int index = 0;
 
 	while(entry[index]) {
 		if (isprint(entry[index])) {
@@ -122,6 +124,7 @@ printraw_q(char* entry)
 void
 printinode_i(struct stat sb, int padding) 
 {
+	
 	(void)printf("%*ld ", padding, sb.st_ino);
 }
 
@@ -163,30 +166,30 @@ printblocks_s(int blocks, int size, int isEntry, int blockpadding)
 	}
 }
 
-/* Prints the long format of an entry */ 
+/* 
+ * Prints the long format of an entry 
+*/ 
 void
 printlong_l(char* entry, char* path, struct stat sb, 
-struct paddings paddings) 
+paddings paddings) 
 {
-	char sizebuf[6];
-	char permbuf[12];
-	char timebuf[13];
-	char linkbuf[PATH_MAX], fullpath[PATH_MAX], currentdir[PATH_MAX];
 	char* timeformat;
-	
-	int invalidgid, invaliduid, humanizeflags;
+	int invalidgid, invaliduid, humanizeflags; /* Local print flags  */
 	int entrymode, majornum, minornum, numlinks;
 	int hpadding, len;
 	int currentyear, fileyear;	
-	dev_t devicetype;
-	time_t currentepochtime, fileepochtime;
 	uid_t uid;
 	gid_t gid;
-	struct tm *currenttime, *filetime;
+	char sizebuf[6];
+	dev_t devicetype;
+	time_t currentepochtime, fileepochtime;
+	char permbuf[12];
+	char timebuf[13];
+	char linkbuf[PATH_MAX], fullpath[PATH_MAX];
 	struct group *group;
 	struct passwd *passwd;
+	struct tm *currenttime, *filetime;
 
-	getcwd(currentdir, sizeof(currentdir));
 	
 	entrymode = sb.st_mode;
 	(void)strmode(entrymode, permbuf);
@@ -253,6 +256,10 @@ struct paddings paddings)
 		 paddings.group, group->gr_name);
 	}
 
+	devicetype = sb.st_rdev;
+	majornum = major(devicetype);
+	minornum = minor(devicetype);
+	
 	if (h_humanreadable == 1) {
 		hpadding = sizeof(sizebuf);	
 		/* Major/Minor numbers take up more space than size  */
@@ -263,9 +270,6 @@ struct paddings paddings)
 		}
 		
 		if (S_ISBLK(entrymode) || S_ISCHR(entrymode)) {
-			devicetype = sb.st_rdev;
-			majornum = major(devicetype);
-			minornum = minor(devicetype);
 			(void)printf(" %*d,%*d ", paddings.major, majornum, paddings.minor, minornum);
 		} else {
 			humanizeflags = HN_DECIMAL | HN_B | HN_NOSPACE;
@@ -285,9 +289,6 @@ struct paddings paddings)
 		}
 		
 		if (S_ISBLK(entrymode) || S_ISCHR(entrymode)) {
-			devicetype = sb.st_rdev;
-			majornum = major(devicetype);
-			minornum = minor(devicetype);
 			(void)printf(" %*d,%*d ", paddings.major, majornum, paddings.minor, minornum);
 		} else { 
 			(void)printf(" %*" PRIdMAX " ", (intmax_t)(paddings.size + 1), sb.st_size);
@@ -302,6 +303,7 @@ struct paddings paddings)
 		(void)printf("%s ", entry);
 	}
 
+	/* Build entry path for readlink(1) */
 	len = strlen(path) + 1 + strlen(basename(entry));
 	if (len != snprintf(fullpath, PATH_MAX, "%s/%s", path, basename(entry))) {
 		fprintf(stderr, "Could not format path off entry: %s\n", entry);
@@ -313,11 +315,8 @@ struct paddings paddings)
 		if ((len = readlink(fullpath, linkbuf, sizeof(linkbuf) - 1)) != -1) {
 			linkbuf[len] = '\0';
 			printf(" -> %s", linkbuf);
-		} else if  ((len = readlink(entry, linkbuf, sizeof(linkbuf) - 1)) != -1){
-			linkbuf[len] = '\0';
-			printf(" -> %s", linkbuf);
 		} 
-	}	
+	}
+	
 	printf("\n");
 }
-

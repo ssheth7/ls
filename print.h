@@ -1,9 +1,9 @@
+/*
+ * 10/15/2021
+*/
+
 #ifndef _PRINT_H_
 #define _PRINT_H_
-
-#include <sys/stat.h>
-
-#include "helpers.h"
 
 void addsymbols_F(char**, struct stat);
 void printdefault(char*);

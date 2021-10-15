@@ -1,6 +1,7 @@
 /*
- * Contains sorting methods for traversal
+ * 10/15/2021 
 */
+
 #include <sys/stat.h>
 
 #include <fts.h>
@@ -11,6 +12,7 @@
 int
 lexicosort(const void* str1, const void* str2) 
 {
+
 	return strcmp(*(const char **) str1, *(const char **) str2);
 }
 
@@ -75,18 +77,6 @@ fts_rtimemodifiedsort(const FTSENT** file1, const FTSENT** file2)
 {
 	time_t file1time = (*file1)->fts_statp->st_mtime;
 	time_t file2time = (*file2)->fts_statp->st_mtime;
-	struct timespec file1tspec, file2tspec;
-	if (file1time < file2time) {
-		return -1;
-	}	
-	if (file1time > file2time) {
-		return 1;
-	}
-	file1tspec = (*file1)->fts_statp->st_atim;
-	file2tspec = (*file2)->fts_statp->st_atim;
-	file1time = file1tspec.tv_nsec;
-	file2time = file2tspec.tv_nsec;
-		
 	if (file1time < file2time) {
 		return -1;
 	}	
@@ -115,24 +105,13 @@ fts_rlastaccesssort(const FTSENT** file1, const FTSENT** file2)
 {
 	time_t file1time = (*file1)->fts_statp->st_atime;
 	time_t file2time = (*file2)->fts_statp->st_atime;
-	struct timespec file1tspec, file2tspec;
 	if (file1time < file2time) {
 		return -1;
 	}	
 	if (file1time > file2time) {
 		return 1;
 	}
-	file1tspec = (*file1)->fts_statp->st_atim;
-	file2tspec = (*file2)->fts_statp->st_atim;
-	file1time = file1tspec.tv_nsec;
-	file2time = file2tspec.tv_nsec;
 		
-	if (file1time < file2time) {
-		return -1;
-	}	
-	if (file1time > file2time) {
-		return 1;
-	}
 	return fts_rlexicosort(file1, file2);
 }
 

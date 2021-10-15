@@ -3,7 +3,6 @@
 */
 #include <sys/stat.h>
 
-#include <dirent.h>
 #include <errno.h>
 #include <fts.h>
 #include <grp.h>
@@ -13,7 +12,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "helpers.h"
 #include "ls.h"
 
 
@@ -49,8 +47,9 @@ extern char **NONDIRS;
  * Gets all the immediate children of a directory and formats each child
 */
 void
-getimmediatechildren(FTSENT* children, int parentlevel, struct paddings *paddings) 
+getimmediatechildren(FTSENT* children, int parentlevel, paddings *paddings) 
 {
+
 	while(children != NULL) {
 		if (children->fts_level == parentlevel + 1) {
 			formatentry(0, children->fts_name, children->fts_path,
@@ -64,7 +63,7 @@ getimmediatechildren(FTSENT* children, int parentlevel, struct paddings *padding
  * Counts the number of block in a directory given a directory structure
 */
 int 
-countblocks(FTSENT *children, struct paddings *paddings)
+countblocks(FTSENT *children, paddings *paddings)
 {
 	int blocks, blocksum, printallflags, size, total;
 	
@@ -94,17 +93,17 @@ countblocks(FTSENT *children, struct paddings *paddings)
 }
 
 /*
- * Updates the print paddings if longer elements exist
+ * Updates the print paddings if longer elements are provided
 */
 void
-getpaddingsizes(struct stat sb, struct paddings *paddings) 
+getpaddingsizes(struct stat sb, paddings *paddings) 
 {
 	int digitlen, gid, links, majornum, minornum, uid;
 	blkcnt_t blocks;
+	dev_t devicetype;
 	ino_t inode;
 	mode_t mode;
 	off_t size;
-	dev_t devicetype;
 	struct group *group;
 	struct passwd *passwd;
 
@@ -177,8 +176,8 @@ getpaddingsizes(struct stat sb, struct paddings *paddings)
 int
 countdigits(long digit)
 {
-	int numdigits;
-	numdigits = 0;
+	int numdigits = 0;
+	
 	while (digit > 0){
 		numdigits++;
 		digit/=10;
@@ -307,6 +306,7 @@ splitargs(int argc, char **argv, int offset)
 {
 	int i, dirindex, nondirindex, arglength;
 	struct stat sb;
+	
 	dirindex = 0;
 	nondirindex = 0;
 	
@@ -344,7 +344,7 @@ splitargs(int argc, char **argv, int offset)
 	
 	for (i = 1 + offset; i < argc; i++){
 
-		if (stat(argv[i], &sb) == 0) {
+		if (lstat(argv[i], &sb) == 0) {
 			arglength = strlen(argv[i]);
 			if (S_ISDIR(sb.st_mode) && d_directories == 0) {
 				if ((DIRS[dirindex] = malloc(arglength + 1)) == NULL) {

@@ -5,14 +5,11 @@
 
 /* Shivam Sheth (ssheth7)
  * ls: list the files in a directory
- * 10/02/2021
+ * 10/15/2021
 */
 
-#include <sys/param.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 
-#include <dirent.h>
 #include <errno.h>
 #include <fts.h>
 #include <libgen.h>
@@ -22,18 +19,8 @@
 #include <unistd.h>
 
 #include "cmp.h"
-#include "ls.h"
 #include "helpers.h"
 #include "print.h"
-
-/*
- TODO:
- documentation
- check print/printfs
- fix comparisons 
- remove structs
- remove includes
-*/
 
 /* flags  */
 int A_allentries;        /* Includes all files but current/previous directory  */
@@ -68,7 +55,7 @@ char **NONDIRS; 	 /* String array of non-directory arguments */
 */
 void
 formatentry(int directentry, char* entry, char* path, 
-	struct stat sb, struct paddings paddings)
+	struct stat sb, paddings paddings)
 {
 	int printallflags = A_allentries || a_allentries;
 	
@@ -105,8 +92,7 @@ formatdir(char* dir)
 	char *dirptr[2];
 	int blocksum, currentlevel, fileinfo;
 	int ftsopenflags, ignoredflag, outputflag, printallflags;
-	int blockpadding, userpadding, grouppadding, sizepadding, inodepadding;
-	static const struct paddings resetpaddings;
+	static const paddings resetpaddings;
 	paddings paddings;
 	FTSENT *blockchildren, *entry, *immediatechildren;
 	FTS *directory;
@@ -156,9 +142,7 @@ formatdir(char* dir)
 	if (a_allentries == 1) {
 		ftsopenflags |= FTS_SEEDOT;
 	}
-	if (R_recurse == 1) {
-		ftsopenflags |= FTS_NOCHDIR;
-	}
+	
 	if ((dirptr[0] = malloc(strlen(dir) + 1)) == NULL) {
 		(void)fprintf(stderr, "Could not allocate memory.\n");
 		exit(EXIT_FAILURE);
@@ -252,8 +236,8 @@ main(int argc, char **argv)
 {
 	int i, argoffset, outputflag;
 	struct stat sb;
+	static const paddings resetpaddings;
 	paddings paddings;
-	static const struct paddings resetpaddings;
 	
 	setprogname(argv[0]);
  	
@@ -268,7 +252,7 @@ main(int argc, char **argv)
 	 
  	/* Counts the number of nondirs and dirs arguments given */		
 	for (i = 1 + argoffset; i < argc; i++){
-		if (stat(argv[i], &sb) == 0) {
+		if (lstat(argv[i], &sb) == 0) {
 			if (S_ISDIR(sb.st_mode) && d_directories == 0) {
 				NUMDIRS++;
 			} else {
@@ -285,13 +269,13 @@ main(int argc, char **argv)
 	}
 	
 	if (NUMDIRS > 0 &&  (DIRS = malloc(NUMDIRS * sizeof(char*))) == NULL) {
-		(void)fprintf(stderr, "Memory could not be allocated");
+		(void)fprintf(stderr, "Memory could not be allocated for DIRS");
 		exit(EXIT_FAILURE);
 	}
 
 
 	if (NUMNONDIRS > 0 && (NONDIRS = malloc(NUMNONDIRS * sizeof(char*))) == NULL) {
-		(void)fprintf(stderr, "Memory could not be allocated");
+		(void)fprintf(stderr, "Memory could not be allocated NONDIRS");
 		exit(EXIT_FAILURE);
 	}
 
@@ -304,7 +288,7 @@ main(int argc, char **argv)
 	if (l_longformat  == 1|| n_numericalids == 1) {
 		paddings = resetpaddings;
 		for (i = 0; i < NUMNONDIRS; i++) {
-			if (stat(NONDIRS[i], &sb) == 0) {
+			if (lstat(NONDIRS[i], &sb) == 0) {
 				getpaddingsizes(sb, &paddings);	
 			}
 		}					
@@ -313,9 +297,9 @@ main(int argc, char **argv)
 	outputflag = 0;
 	/* Formats non directory entries and then directory entries */	
 	for (i = 0; i < NUMNONDIRS; i++) {
-		if (stat(NONDIRS[i], &sb) != 0) {
+		if (lstat(NONDIRS[i], &sb) != 0) {
 			(void)fprintf(stderr, "%s: cannot access %s: No such file or directory.\n"
-			, getprogname(), NONDIRS[i]);
+				, getprogname(), NONDIRS[i]);
 			continue;
 		}
 		formatentry(1, NONDIRS[i], dirname(NONDIRS[i]), sb, paddings);
@@ -325,7 +309,8 @@ main(int argc, char **argv)
 	for (i = 0; i < NUMDIRS; i++) {
 		
 		if (stat(DIRS[i], &sb) != 0) {
-			(void)fprintf(stderr, "%s: cannot access %s: No such file or directory.\n", getprogname(), DIRS[i]);
+			(void)fprintf(stderr, "%s: cannot access %s: No such file or directory.\n"
+				, getprogname(), DIRS[i]);
 			continue;
 		}
 		if (NUMDIRS + NUMNONDIRS > 1) {
